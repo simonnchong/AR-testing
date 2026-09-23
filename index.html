@@ -31,7 +31,9 @@
         document.addEventListener('touchend', this.OnTouchEnd.bind(this));
       },
       OnTouchStart: function (e) {
-        if(document.getElementById('ar-ui-layer').classList.contains('hidden')) return; // Don't interact if AR UI is hidden
+        const arUi = document.getElementById('ar-ui-container');
+        if(!arUi || arUi.classList.contains('hidden')) return; // Don't interact if marker isn't found
+        
         if (e.touches.length === 1) {
           this.ifMouseDown = true;
           this.x_cord = e.touches[0].clientX;
@@ -46,7 +48,8 @@
         }
       },
       OnTouchMove: function (e) {
-        if(document.getElementById('ar-ui-layer').classList.contains('hidden')) return;
+        const arUi = document.getElementById('ar-ui-container');
+        if(!arUi || arUi.classList.contains('hidden')) return; // Don't interact if marker is lost
         if(e.target.closest('.no-ar-touch')) return; // Prevent rotation when touching UI buttons
         
         if (this.ifMouseDown && e.touches.length === 1) {
@@ -80,7 +83,7 @@
   </script>
 
   <style>
-    body { font-family: 'Inter', sans-serif; background-color: #0f172a; margin: 0; overflow: hidden; }
+    html, body { width: 100vw; height: 100vh; font-family: 'Inter', sans-serif; background-color: #0f172a; margin: 0; padding: 0; overflow: hidden; }
     /* Glassmorphism utility */
     .glass { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2); }
     .glass-dark { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
@@ -90,7 +93,7 @@
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     
     /* A-Frame container fixes */
-    #ar-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+    #ar-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; overflow: hidden; background: #000; }
     .ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 50; overflow-y: auto; }
   </style>
 </head>
@@ -110,7 +113,7 @@
         id: 'fc',
         title: 'Faculty of Computing',
         desc: 'Formerly known as FSKSM, the Faculty of Computing is located at Block N28. It is UTM\'s premier hub for software engineering, computer science, and IT, fostering the next generation of tech innovators.',
-        img: 'fc.jpg',
+        img: 'fc.png',
         mindFile: 'fc.mind'
       }
     };
@@ -531,7 +534,7 @@
         // Save history results to Local Storage
         const attempt = (appState.quizHistory ? appState.quizHistory.length : 0) + 1;
         const now = new Date();
-        const dateStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const dateStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         
         appState.quizHistory.push({ attempt, score: currentScore, total: quizData.length, date: dateStr });
         saveState();
@@ -707,6 +710,9 @@
             </a-entity>
           </a-scene>
         `;
+
+        // Force resize event to fix black gap on camera frame in MindAR
+        setTimeout(() => { window.dispatchEvent(new Event('resize')); }, 500);
 
       } else {
         // GENERAL WEB MODE
