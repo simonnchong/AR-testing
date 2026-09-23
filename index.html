@@ -142,47 +142,62 @@
 
   <script>
     window.addEventListener('unhandledrejection', function(event) {
-      console.warn("Caught unhandled promise rejection. (Often due to missing files or camera block)", event.reason || event);
+      console.warn("Caught unhandled promise rejection. This usually means a file is missing.", event.reason || event);
       event.preventDefault(); 
     });
 
     document.addEventListener("DOMContentLoaded", function() {
+      // 1. DYNAMIC CAMERA CONFIGURATION
+      // Check if URL has a specific camera mode requested (for our flip fallback)
+      const urlParams = new URLSearchParams(window.location.search);
+      const currentFacingMode = urlParams.get('facingMode') || 'environment';
+      
+      const sceneEl = document.querySelector('a-scene');
+      // Apply the camera mode before the AR system starts
+      sceneEl.setAttribute('mindar-image', `imageTargetSrc: masjid.mind; autoStart: false; filterMinCF:0.0001; filterBeta: 0.001; facingMode: ${currentFacingMode};`);
+
       const startBtn = document.getElementById("start-btn");
       const startScreen = document.getElementById("start-screen");
-      const sceneEl = document.querySelector('a-scene');
-
       const flipBtn = document.getElementById("flip-btn");
       const captureBtn = document.getElementById("capture-btn");
       const galleryBtn = document.getElementById("gallery-btn");
       const galleryModal = document.getElementById("gallery-modal");
       const closeGalleryBtn = document.getElementById("close-gallery");
       const galleryImage = document.getElementById("gallery-image");
-      const uiContainer = document.getElementById("ui-container");
 
       startBtn.addEventListener("click", function() {
         startScreen.style.display = "none";
         const arSystem = sceneEl.systems["mindar-image-system"];
         if(arSystem) {
             arSystem.start().catch((err) => {
+                console.error("MindAR failed to start.", err);
                 alert("Failed to start AR. Please ensure camera access is allowed.");
             });
         }
       });
 
-      // 1. Flip Camera
       flipBtn.addEventListener("click", function() {
         const arSystem = sceneEl.systems["mindar-image-system"];
-        if(arSystem) {
+        
+        function forceReloadFlip() {
+            // Brute-force fallback: Reload the page requesting the opposite camera
+            const url = new URL(window.location.href);
+            const nextMode = currentFacingMode === "environment" ? "user" : "environment";
+            url.searchParams.set("facingMode", nextMode);
+            window.location.href = url.href;
+        }
+
+        if(arSystem && typeof arSystem.switchCamera === 'function') {
           try {
-            if (typeof arSystem.switchCamera === 'function') arSystem.switchCamera();
-            else alert("Your browser/device does not support flipping the camera in this mode.");
+            arSystem.switchCamera(); // Try smooth transition first
           } catch(e) {
-            alert("Error switching camera.");
+            forceReloadFlip();
           }
+        } else {
+           forceReloadFlip();
         }
       });
 
-      // 2. CAPTURE LOGIC (Hides UI, Adds Flash, Aspect Ratio Math, Timestamps)
       captureBtn.addEventListener("click", function() {
         const video = document.querySelector('video');
         const glCanvas = sceneEl.canvas;
@@ -192,89 +207,70 @@
           return;
         }
 
-        // HIDE THE UI BEFORE CAPTURE
-        uiContainer.style.display = "none";
+        // INSTANTLY capture canvas before browser clears WebGL buffer
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = glCanvas.width;
+        tempCanvas.height = glCanvas.height;
+        const ctx = tempCanvas.getContext('2d');
 
-        // ADD VISUAL FLASH EFFECT
+        // Precise video scaling math
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+        const cw = glCanvas.width;
+        const ch = glCanvas.height;
+        const vRatio = vw / vh;
+        const cRatio = cw / ch;
+        
+        let drawWidth, drawHeight, startX, startY;
+        if (vRatio > cRatio) {
+           drawHeight = ch;
+           drawWidth = vw * (ch / vh);
+           startX = (cw - drawWidth) / 2;
+           startY = 0;
+        } else {
+           drawWidth = cw;
+           drawHeight = vh * (cw / vw);
+           startX = 0;
+           startY = (ch - drawHeight) / 2;
+        }
+
+        // Merge Camera + 3D Model
+        ctx.drawImage(video, startX, startY, drawWidth, drawHeight);
+        ctx.drawImage(glCanvas, 0, 0, cw, ch);
+        const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.9);
+
+        // Visual flash effect
         const flash = document.createElement('div');
         flash.style.position = 'absolute';
         flash.style.top = '0'; flash.style.left = '0';
         flash.style.width = '100%'; flash.style.height = '100%';
         flash.style.backgroundColor = 'white';
         flash.style.zIndex = '999999';
-        flash.style.transition = 'opacity 0.4s ease-out';
+        flash.style.transition = 'opacity 0.5s';
         document.body.appendChild(flash);
+        setTimeout(() => { flash.style.opacity = '0'; setTimeout(() => flash.remove(), 500); }, 50);
 
-        // Wait slightly so the browser genuinely hides the UI layer
-        setTimeout(() => {
-          
-          // Fade out the flash
-          flash.style.opacity = '0';
-          setTimeout(() => flash.remove(), 400);
+        // Timestamp Filename
+        const now = new Date();
+        const timestamp = now.getFullYear().toString() + 
+                         (now.getMonth()+1).toString().padStart(2,'0') + 
+                         now.getDate().toString().padStart(2,'0') + '_' + 
+                         now.getHours().toString().padStart(2,'0') + 
+                         now.getMinutes().toString().padStart(2,'0') + 
+                         now.getSeconds().toString().padStart(2,'0');
+        const fileName = 'Masjid_' + timestamp + '.jpg';
 
-          // Prepare the temporary canvas for merging
-          const tempCanvas = document.createElement('canvas');
-          tempCanvas.width = glCanvas.width;
-          tempCanvas.height = glCanvas.height;
-          const ctx = tempCanvas.getContext('2d');
+        // Trigger Download
+        const link = document.createElement('a');
+        link.download = fileName;
+        link.href = dataUrl;
+        link.click();
 
-          // PRECISE ASPECT RATIO MATH for Camera Video
-          const vw = video.videoWidth;
-          const vh = video.videoHeight;
-          const cw = glCanvas.width;
-          const ch = glCanvas.height;
-          const vRatio = vw / vh;
-          const cRatio = cw / ch;
-          
-          let drawWidth, drawHeight, startX, startY;
-          if (vRatio > cRatio) {
-             drawHeight = ch;
-             drawWidth = vw * (ch / vh);
-             startX = (cw - drawWidth) / 2;
-             startY = 0;
-          } else {
-             drawWidth = cw;
-             drawHeight = vh * (cw / vw);
-             startX = 0;
-             startY = (ch - drawHeight) / 2;
-          }
-
-          // Draw Camera Video
-          ctx.drawImage(video, startX, startY, drawWidth, drawHeight);
-          
-          // Draw 3D Model Layer on top
-          ctx.drawImage(glCanvas, 0, 0, cw, ch);
-
-          // Get image data
-          const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.9);
-
-          // AUTOMATIC TIMESTAMP NAMING (Masjid_YYYYMMDD_HHMMSS)
-          const now = new Date();
-          const timestamp = now.getFullYear().toString() + 
-                           (now.getMonth()+1).toString().padStart(2,'0') + 
-                           now.getDate().toString().padStart(2,'0') + '_' + 
-                           now.getHours().toString().padStart(2,'0') + 
-                           now.getMinutes().toString().padStart(2,'0') + 
-                           now.getSeconds().toString().padStart(2,'0');
-          const fileName = 'Masjid_' + timestamp + '.jpg';
-
-          // Download image to phone
-          const link = document.createElement('a');
-          link.download = fileName;
-          link.href = dataUrl;
-          link.click();
-
-          // Save to LocalStorage for Gallery viewing
-          try { localStorage.setItem('savedMasjidSnapshot', dataUrl); } 
-          catch (e) { console.warn("Could not save to LocalStorage", e); }
-
-          // RESTORE UI AFTER CAPTURE
-          uiContainer.style.display = "block";
-
-        }, 150); // Delay to ensure UI disappears
+        // Save to LocalStorage
+        try { localStorage.setItem('savedMasjidSnapshot', dataUrl); } 
+        catch (e) { console.warn("Could not save to LocalStorage", e); }
       });
 
-      // 3. Gallery
       galleryBtn.addEventListener("click", function() {
         const savedImage = localStorage.getItem('savedMasjidSnapshot');
         if (savedImage) {
