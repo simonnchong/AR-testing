@@ -11,8 +11,70 @@
   <!-- MindAR library for image tracking in A-Frame -->
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js" crossorigin="anonymous"></script>
   
-  <!-- A-Frame gestures library for touch rotation, scaling, and dragging -->
-  <script src="https://raw.githack.com/fcor/arjs-gestures/master/dist/gestures.js" crossorigin="anonymous"></script>
+  <!-- Custom Touch Rotation & Scaling Script (Replaces buggy arjs-gestures) -->
+  <script>
+    AFRAME.registerComponent('drag-rotate-scale', {
+      schema: { speed: { default: 1.5 } },
+      init: function () {
+        this.ifMouseDown = false;
+        this.x_cord = 0;
+        this.y_cord = 0;
+        this.initialScale = this.el.object3D.scale.x;
+        this.initialDistance = 0;
+
+        // Listen for touches anywhere on the screen
+        document.addEventListener('touchstart', this.OnTouchStart.bind(this), {passive: true});
+        document.addEventListener('touchmove', this.OnTouchMove.bind(this), {passive: false});
+        document.addEventListener('touchend', this.OnTouchEnd.bind(this));
+      },
+      OnTouchStart: function (e) {
+        if (e.touches.length === 1) {
+          this.ifMouseDown = true;
+          this.x_cord = e.touches[0].clientX;
+          this.y_cord = e.touches[0].clientY;
+        } else if (e.touches.length === 2) {
+          this.ifMouseDown = false;
+          this.initialDistance = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+          );
+          this.initialScale = this.el.object3D.scale.x;
+        }
+      },
+      OnTouchMove: function (e) {
+        // Don't interact with the 3D model if touching UI buttons
+        if(e.target.id === 'start-btn') return;
+        
+        if (this.ifMouseDown && e.touches.length === 1) {
+          e.preventDefault(); // Stop page scrolling
+          var temp_x = e.touches[0].clientX - this.x_cord;
+          var temp_y = e.touches[0].clientY - this.y_cord;
+          
+          // Rotate around Y and X axis based on finger drag
+          this.el.object3D.rotation.y += temp_x * this.data.speed * 0.01;
+          this.el.object3D.rotation.x += temp_y * this.data.speed * 0.01;
+          
+          this.x_cord = e.touches[0].clientX;
+          this.y_cord = e.touches[0].clientY;
+        } else if (e.touches.length === 2) {
+          e.preventDefault(); // Stop browser zooming
+          var currentDistance = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+          );
+          var scaleFactor = currentDistance / this.initialDistance;
+          var newScale = this.initialScale * scaleFactor;
+          
+          // Limit scale size (min 0.05, max 5)
+          newScale = Math.max(0.05, Math.min(newScale, 5));
+          this.el.object3D.scale.set(newScale, newScale, newScale);
+        }
+      },
+      OnTouchEnd: function () {
+        this.ifMouseDown = false;
+      }
+    });
+  </script>
 
   <style>
     body {
@@ -137,72 +199,102 @@
 
   <!-- 
     A-Frame Scene configured for MindAR image tracking.
-    gesture-detector component attached to scene to listen for multi-touch gestures.
   -->
   <a-scene 
     mindar-image="imageTargetSrc: masjid.mind; autoStart: false; filterMinCF:0.0001; filterBeta: 0.001;" 
     color-space="sRGB" 
     renderer="colorManagement: true; physicallyCorrectLights: true;" 
-    <a-scene 
-    mindar-image="imageTargetSrc: masjid.mind; autoStart: false; filterMinCF:0.0001; filterBeta: 0.001;" 
-    color-space="sRGB" 
-    renderer="colorManagement: true; physicallyCorrectLights: true;" 
     vr-mode-ui="enabled: false" 
-    device-orientation-permission-ui="enabled: false"
-    gesture-detector>
+    device-orientation-permission-ui="enabled: false">
     
-    <!-- We removed the a-assets section since we are not loading an external file right now -->
+    <!-- Code-generated Textures (No external downloads required) -->
+    <a-assets>
+      <img id="tex-marble" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' fill='%23f8fafc'/><path d='M0 63 L64 63 M63 0 L63 64' stroke='%23e2e8f0' stroke-width='2'/></svg>">
+      <img id="tex-wall" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' fill='%23f1f5f9'/><path d='M0 32 L64 32 M32 0 L32 32 M0 32 L0 64' stroke='%23cbd5e1' stroke-width='2'/></svg>">
+    </a-assets>
 
-    <!-- Camera is stationary in MindAR, the world moves around it -->
-    <a-camera position="0 0 0" look-controls="enabled: false">
-      <!-- Cursor is needed to detect intersections for touch gestures -->
-      <a-entity cursor="fuse: false; rayOrigin: mouse;" raycaster="objects: .clickable"></a-entity>
-    </a-camera>
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-    <!-- Image Target Entity. targetIndex: 0 maps to the first image in your .mind file. -->
+    <!-- Image Target Entity -->
     <a-entity mindar-image-target="targetIndex: 0">
       
       <!-- 
-        Custom 3D Masjid made from A-Frame primitives.
-        Groups all shapes in one entity so they rotate and scale together.
+        Custom 3D Masjid Group. 
+        Attached the custom 'drag-rotate-scale' component here!
       -->
-      <a-entity 
-        class="clickable" 
-        gesture-handler="minScale: 0.1; maxScale: 10;"
-        position="0 0 0" 
-        scale="0.4 0.4 0.4">
+      <a-entity drag-rotate-scale position="0 -0.2 0" scale="0.4 0.4 0.4">
         
-        <!-- Main Building Base (White) -->
-        <a-box position="0 0.5 0" width="1.5" height="1" depth="1.5" color="#f8fafc" shadow></a-box>
+        <!-- Courtyard / Marble Base -->
+        <a-box position="0 0 0" width="2.2" height="0.1" depth="2.2" src="#tex-marble" repeat="4 4" shadow></a-box>
         
-        <!-- Main Central Dome (Emerald Green, Hemisphere) -->
-        <a-sphere position="0 1 0" radius="0.5" color="#10b981" theta-length="180" shadow></a-sphere>
+        <!-- Main Building Block -->
+        <a-box position="0 0.5 0" width="1.4" height="0.9" depth="1.4" src="#tex-wall" repeat="2 1.5" material="roughness: 0.9;" shadow></a-box>
+        
+        <!-- Main Dome Drum (Base) -->
+        <a-cylinder position="0 1.05 0" radius="0.55" height="0.2" color="#e2e8f0" material="roughness: 0.9;"></a-cylinder>
+        
+        <!-- Main Central Dome (Slightly shiny Emerald) -->
+        <a-sphere position="0 1.15 0" radius="0.55" color="#10b981" theta-length="180" material="roughness: 0.3; metalness: 0.2"></a-sphere>
+        
+        <!-- Main Dome Gold Finial & Crescent Moon -->
+        <a-cylinder position="0 1.8 0" radius="0.02" height="0.3" color="#fbbf24" material="metalness: 0.8; roughness: 0.2"></a-cylinder>
+        <a-torus position="0 2.0 0" radius="0.08" radius-tubular="0.015" arc="180" color="#fbbf24" rotation="0 90 90" material="metalness: 0.8; roughness: 0.2"></a-torus>
 
+        <!-- Arched Iwan (Entrance) -->
+        <a-entity position="0 0.05 0.7">
+          <!-- Cutout Illusion -->
+          <a-box position="0 0.3 0.02" width="0.4" height="0.6" depth="0.05" color="#1e293b"></a-box>
+          <a-cylinder position="0 0.6 0.02" radius="0.2" height="0.05" rotation="90 0 0" color="#1e293b" theta-length="180"></a-cylinder>
+          
+          <!-- Entrance Pillars -->
+          <a-cylinder position="-0.2 0.3 0.06" radius="0.03" height="0.6" color="#fbbf24" material="metalness: 0.6; roughness: 0.4"></a-cylinder>
+          <a-cylinder position="0.2 0.3 0.06" radius="0.03" height="0.6" color="#fbbf24" material="metalness: 0.6; roughness: 0.4"></a-cylinder>
+        </a-entity>
+
+        <!-- === MINARETS === -->
+        
         <!-- Front Left Minaret -->
-        <a-cylinder position="-0.6 1 0.6" radius="0.08" height="2" color="#e2e8f0"></a-cylinder>
-        <a-sphere position="-0.6 2 0.6" radius="0.12" color="#10b981" theta-length="180"></a-sphere>
+        <a-entity position="-0.65 0 0.65">
+          <a-box position="0 0.3 0" width="0.2" height="0.6" depth="0.2" src="#tex-wall"></a-box>
+          <a-cylinder position="0 0.9 0" radius="0.06" height="0.7" color="#f8fafc"></a-cylinder>
+          <a-cylinder position="0 1.25 0" radius="0.1" height="0.05" color="#94a3b8"></a-cylinder> <!-- Balcony -->
+          <a-cylinder position="0 1.5 0" radius="0.04" height="0.5" color="#f8fafc"></a-cylinder>
+          <a-sphere position="0 1.75 0" radius="0.06" color="#10b981" theta-length="180" material="roughness: 0.3; metalness: 0.2"></a-sphere>
+          <a-cylinder position="0 1.85 0" radius="0.005" height="0.15" color="#fbbf24"></a-cylinder>
+        </a-entity>
 
         <!-- Front Right Minaret -->
-        <a-cylinder position="0.6 1 0.6" radius="0.08" height="2" color="#e2e8f0"></a-cylinder>
-        <a-sphere position="0.6 2 0.6" radius="0.12" color="#10b981" theta-length="180"></a-sphere>
+        <a-entity position="0.65 0 0.65">
+          <a-box position="0 0.3 0" width="0.2" height="0.6" depth="0.2" src="#tex-wall"></a-box>
+          <a-cylinder position="0 0.9 0" radius="0.06" height="0.7" color="#f8fafc"></a-cylinder>
+          <a-cylinder position="0 1.25 0" radius="0.1" height="0.05" color="#94a3b8"></a-cylinder>
+          <a-cylinder position="0 1.5 0" radius="0.04" height="0.5" color="#f8fafc"></a-cylinder>
+          <a-sphere position="0 1.75 0" radius="0.06" color="#10b981" theta-length="180" material="roughness: 0.3; metalness: 0.2"></a-sphere>
+          <a-cylinder position="0 1.85 0" radius="0.005" height="0.15" color="#fbbf24"></a-cylinder>
+        </a-entity>
 
         <!-- Back Left Minaret -->
-        <a-cylinder position="-0.6 1 -0.6" radius="0.08" height="2" color="#e2e8f0"></a-cylinder>
-        <a-sphere position="-0.6 2 -0.6" radius="0.12" color="#10b981" theta-length="180"></a-sphere>
+        <a-entity position="-0.65 0 -0.65">
+          <a-box position="0 0.3 0" width="0.2" height="0.6" depth="0.2" src="#tex-wall"></a-box>
+          <a-cylinder position="0 0.9 0" radius="0.06" height="0.7" color="#f8fafc"></a-cylinder>
+          <a-cylinder position="0 1.25 0" radius="0.1" height="0.05" color="#94a3b8"></a-cylinder>
+          <a-cylinder position="0 1.5 0" radius="0.04" height="0.5" color="#f8fafc"></a-cylinder>
+          <a-sphere position="0 1.75 0" radius="0.06" color="#10b981" theta-length="180" material="roughness: 0.3; metalness: 0.2"></a-sphere>
+          <a-cylinder position="0 1.85 0" radius="0.005" height="0.15" color="#fbbf24"></a-cylinder>
+        </a-entity>
 
         <!-- Back Right Minaret -->
-        <a-cylinder position="0.6 1 -0.6" radius="0.08" height="2" color="#e2e8f0"></a-cylinder>
-        <a-sphere position="0.6 2 -0.6" radius="0.12" color="#10b981" theta-length="180"></a-sphere>
-
-        <!-- Arched Doorway (Dark Slate) -->
-        <a-box position="0 0.3 0.75" width="0.4" height="0.6" depth="0.05" color="#1e293b"></a-box>
-        <!-- Top of the arch -->
-        <a-cylinder position="0 0.6 0.75" radius="0.2" height="0.05" rotation="90 0 0" color="#1e293b" theta-length="180"></a-cylinder>
+        <a-entity position="0.65 0 -0.65">
+          <a-box position="0 0.3 0" width="0.2" height="0.6" depth="0.2" src="#tex-wall"></a-box>
+          <a-cylinder position="0 0.9 0" radius="0.06" height="0.7" color="#f8fafc"></a-cylinder>
+          <a-cylinder position="0 1.25 0" radius="0.1" height="0.05" color="#94a3b8"></a-cylinder>
+          <a-cylinder position="0 1.5 0" radius="0.04" height="0.5" color="#f8fafc"></a-cylinder>
+          <a-sphere position="0 1.75 0" radius="0.06" color="#10b981" theta-length="180" material="roughness: 0.3; metalness: 0.2"></a-sphere>
+          <a-cylinder position="0 1.85 0" radius="0.005" height="0.15" color="#fbbf24"></a-cylinder>
+        </a-entity>
 
       </a-entity>
-      
     </a-entity>
-
   </a-scene>
 </body>
 </html>
