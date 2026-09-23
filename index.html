@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Masjid Web AR Experience</title>
+
+  <!-- A-Frame VR/AR framework (Updated to 1.4.2 for better stability) -->
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js" crossorigin="anonymous"></script>
+  
+  <!-- MindAR library for image tracking in A-Frame -->
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js" crossorigin="anonymous"></script>
+  
+  <!-- A-Frame gestures library for touch rotation, scaling, and dragging -->
+  <script src="https://raw.githack.com/fcor/arjs-gestures/master/dist/gestures.js" crossorigin="anonymous"></script>
+
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: 'Inter', sans-serif;
+      background-color: #000;
+    }
+    
+    #start-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(15, 23, 42, 0.9);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      backdrop-filter: blur(10px);
+    }
+
+    #start-screen h1 {
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+
+    #start-screen p {
+      margin-bottom: 30px;
+      font-size: 16px;
+      color: #cbd5e1;
+      text-align: center;
+      max-width: 80%;
+    }
+
+    #start-btn {
+      background-color: #3b82f6;
+      color: white;
+      border: none;
+      padding: 15px 35px;
+      font-size: 18px;
+      font-weight: bold;
+      border-radius: 30px;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(59, 130, 246, 0.5);
+      transition: transform 0.2s, background-color 0.2s;
+    }
+
+    #start-btn:active {
+      transform: scale(0.95);
+      background-color: #2563eb;
+    }
+
+    #ui-container {
+      position: absolute;
+      bottom: 20px;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      z-index: 10;
+      pointer-events: none; /* Let touches pass through to the AR canvas */
+    }
+    
+    .instruction-badge {
+      display: inline-block;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 14px;
+      backdrop-filter: blur(5px);
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+  </style>
+
+  <script>
+    // This catches unhandled rejections and extracts the real error message 
+    // instead of showing a cryptic object. Helpful for catching missing files.
+    window.addEventListener('unhandledrejection', function(event) {
+      console.warn("Caught unhandled promise rejection. This usually means a file (.mind, .glb) is missing.", event.reason || event);
+      event.preventDefault(); 
+    });
+
+    document.addEventListener("DOMContentLoaded", function() {
+      const startBtn = document.getElementById("start-btn");
+      const startScreen = document.getElementById("start-screen");
+      const sceneEl = document.querySelector('a-scene');
+
+      startBtn.addEventListener("click", function() {
+        // Hide the start screen
+        startScreen.style.display = "none";
+
+        // Start the MindAR Engine manually now that we have user interaction
+        const arSystem = sceneEl.systems["mindar-image-system"];
+        if(arSystem) {
+            arSystem.start().catch((err) => {
+                console.error("MindAR failed to start. Ensure camera permissions are granted and files are available.", err);
+                alert("Failed to start AR. Please ensure camera access is allowed and your .mind/.glb files are in the repository.");
+            });
+        }
+      });
+    });
+  </script>
+</head>
+<body>
+
+  <div id="start-screen">
+    <h1>Masjid AR</h1>
+    <p>Allow camera access and scan the image to view the 3D model.</p>
+    <button id="start-btn">Start Experience</button>
+  </div>
+
+  <!-- UI Overlay for Instructions -->
+  <div id="ui-container">
+    <div class="instruction-badge">
+      Scan the image. Use fingers to rotate & scale.
+    </div>
+  </div>
+
+  <!-- 
+    A-Frame Scene configured for MindAR image tracking.
+    gesture-detector component attached to scene to listen for multi-touch gestures.
+  -->
+  <a-scene 
+    mindar-image="imageTargetSrc: masjid.mind; autoStart: false; filterMinCF:0.0001; filterBeta: 0.001;" 
+    color-space="sRGB" 
+    renderer="colorManagement: true; physicallyCorrectLights: true;" 
+    <a-scene 
+    mindar-image="imageTargetSrc: masjid.mind; autoStart: false; filterMinCF:0.0001; filterBeta: 0.001;" 
+    color-space="sRGB" 
+    renderer="colorManagement: true; physicallyCorrectLights: true;" 
+    vr-mode-ui="enabled: false" 
+    device-orientation-permission-ui="enabled: false"
+    gesture-detector>
+    
+    <!-- We removed the a-assets section since we are not loading an external file right now -->
+
+    <!-- Camera is stationary in MindAR, the world moves around it -->
+    <a-camera position="0 0 0" look-controls="enabled: false">
+      <!-- Cursor is needed to detect intersections for touch gestures -->
+      <a-entity cursor="fuse: false; rayOrigin: mouse;" raycaster="objects: .clickable"></a-entity>
+    </a-camera>
+
+    <!-- Image Target Entity. targetIndex: 0 maps to the first image in your .mind file. -->
+    <a-entity mindar-image-target="targetIndex: 0">
+      
+      <!-- 
+        Custom 3D Masjid made from A-Frame primitives.
+        Groups all shapes in one entity so they rotate and scale together.
+      -->
+      <a-entity 
+        class="clickable" 
+        gesture-handler="minScale: 0.1; maxScale: 10;"
+        position="0 0 0" 
+        scale="0.4 0.4 0.4">
+        
+        <!-- Main Building Base (White) -->
+        <a-box position="0 0.5 0" width="1.5" height="1" depth="1.5" color="#f8fafc" shadow></a-box>
+        
+        <!-- Main Central Dome (Emerald Green, Hemisphere) -->
+        <a-sphere position="0 1 0" radius="0.5" color="#10b981" theta-length="180" shadow></a-sphere>
+
+        <!-- Front Left Minaret -->
+        <a-cylinder position="-0.6 1 0.6" radius="0.08" height="2" color="#e2e8f0"></a-cylinder>
+        <a-sphere position="-0.6 2 0.6" radius="0.12" color="#10b981" theta-length="180"></a-sphere>
+
+        <!-- Front Right Minaret -->
+        <a-cylinder position="0.6 1 0.6" radius="0.08" height="2" color="#e2e8f0"></a-cylinder>
+        <a-sphere position="0.6 2 0.6" radius="0.12" color="#10b981" theta-length="180"></a-sphere>
+
+        <!-- Back Left Minaret -->
+        <a-cylinder position="-0.6 1 -0.6" radius="0.08" height="2" color="#e2e8f0"></a-cylinder>
+        <a-sphere position="-0.6 2 -0.6" radius="0.12" color="#10b981" theta-length="180"></a-sphere>
+
+        <!-- Back Right Minaret -->
+        <a-cylinder position="0.6 1 -0.6" radius="0.08" height="2" color="#e2e8f0"></a-cylinder>
+        <a-sphere position="0.6 2 -0.6" radius="0.12" color="#10b981" theta-length="180"></a-sphere>
+
+        <!-- Arched Doorway (Dark Slate) -->
+        <a-box position="0 0.3 0.75" width="0.4" height="0.6" depth="0.05" color="#1e293b"></a-box>
+        <!-- Top of the arch -->
+        <a-cylinder position="0 0.6 0.75" radius="0.2" height="0.05" rotation="90 0 0" color="#1e293b" theta-length="180"></a-cylinder>
+
+      </a-entity>
+      
+    </a-entity>
+
+  </a-scene>
+</body>
+</html>
