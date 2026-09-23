@@ -137,12 +137,12 @@
 
     #ui-container {
       position: absolute;
-      bottom: 20px;
+      bottom: 60px; /* Moved up to prevent phone browser bars from hiding it */
       left: 0;
       width: 100%;
       text-align: center;
-      z-index: 10;
-      pointer-events: none; /* Let touches pass through to the AR canvas */
+      z-index: 99999; /* Massive z-index to ensure it sits on top of AR */
+      pointer-events: none;
     }
     
     .instruction-badge {
@@ -154,19 +154,20 @@
       font-size: 14px;
       backdrop-filter: blur(5px);
       box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-      margin-bottom: 10px;
+      margin-bottom: 20px;
     }
 
     #controls-container {
       position: absolute;
-      bottom: 20px;
+      bottom: 60px; /* Moved up */
       left: 0;
       width: 100%;
       display: flex;
       justify-content: center;
-      gap: 15px;
-      z-index: 20;
-      pointer-events: auto; /* Re-enable touches for buttons */
+      align-items: center;
+      gap: 20px;
+      z-index: 99999; /* Massive z-index */
+      pointer-events: auto;
     }
 
     .control-btn {
