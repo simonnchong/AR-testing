@@ -124,12 +124,15 @@
     // Local Storage State Management
     let appState = JSON.parse(localStorage.getItem('utmExplorerState')) || {
       masjid: { checkedIn: false, photo: null },
-      fc: { checkedIn: false, photo: null }
+      fc: { checkedIn: false, photo: null },
+      quizHistory: []
     };
+    // Retrofit existing states to support history array
+    if (!appState.quizHistory) appState.quizHistory = [];
     
     let currentQuizIndex = 0;
     let currentScore = 0;
-    let arViewMode = 'info'; // 'info' or '3d'
+    let arViewMode = 'info'; 
     let activeArPlace = null;
 
     function saveState() {
@@ -139,37 +142,40 @@
     function checkAllCompleted() {
       return appState.masjid.checkedIn && appState.fc.checkedIn;
     }
+
+    // AR Marker Event Listener
+    AFRAME.registerComponent('marker-handler', {
+      init: function () {
+        this.el.addEventListener('targetFound', () => {
+          const arUi = document.getElementById('ar-ui-container');
+          const scanOverlay = document.getElementById('scanning-overlay');
+          if(arUi) arUi.classList.remove('hidden');
+          if(scanOverlay) scanOverlay.classList.add('hidden');
+        });
+        this.el.addEventListener('targetLost', () => {
+          const arUi = document.getElementById('ar-ui-container');
+          const scanOverlay = document.getElementById('scanning-overlay');
+          if(arUi) arUi.classList.add('hidden');
+          if(scanOverlay) scanOverlay.classList.remove('hidden');
+        });
+      }
+    });
   </script>
 
   <!-- ========================================== -->
   <!-- SCREEN 1: HOME DASHBOARD                   -->
   <!-- ========================================== -->
-  <div id="screen-home" class="ui-layer bg-gradient-to-br from-slate-900 to-indigo-950 p-6 hidden">
+  <div id="screen-home" class="ui-layer bg-gradient-to-br from-slate-900 to-indigo-950 p-6 hidden pb-24">
     <div class="max-w-md mx-auto mt-8 fade-in">
       <div class="flex justify-between items-center mb-8">
         <h1 class="text-3xl font-bold text-white"><i class="fa-solid fa-map-location-dot text-indigo-400 mr-2"></i> UTM Explorer</h1>
-        <button onclick="navigate('gallery')" class="glass px-4 py-2 rounded-full text-sm font-semibold hover:bg-white/20 transition">
-          <i class="fa-solid fa-images"></i> Gallery
-        </button>
       </div>
       
-      <p class="text-slate-300 mb-6 text-sm">Explore the campus, scan the markers, and check-in to unlock the ultimate UTM quiz!</p>
+      <p class="text-slate-300 mb-6 text-sm">Select a location to explore in AR. Check-in at all spots to unlock the ultimate UTM quiz!</p>
 
       <!-- Location Cards -->
       <div class="space-y-4" id="home-cards-container">
         <!-- Injected via JS -->
-      </div>
-
-      <!-- Quiz Unlock Section -->
-      <div id="quiz-unlock-section" class="mt-8 p-6 glass rounded-2xl text-center hidden border-green-400/30">
-        <div class="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
-          <i class="fa-solid fa-unlock-keyhole text-2xl text-green-400"></i>
-        </div>
-        <h3 class="font-bold text-xl mb-2 text-green-400">Quiz Unlocked!</h3>
-        <p class="text-sm text-slate-300 mb-4">You have successfully explored all locations.</p>
-        <button onclick="navigate('quiz')" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-green-500/30">
-          Start Quiz Now
-        </button>
       </div>
     </div>
   </div>
@@ -184,37 +190,31 @@
         const status = appState[key].checkedIn;
         
         container.innerHTML += `
-          <div onclick="navigate('ar', '${key}')" class="glass rounded-2xl overflow-hidden cursor-pointer transform hover:scale-[1.02] transition shadow-lg relative">
+          <div onclick="navigate('ar', '${key}')" class="glass rounded-2xl overflow-hidden cursor-pointer transform hover:scale-[1.02] transition shadow-lg relative border border-white/5">
             <div class="h-40 w-full overflow-hidden relative">
-              <img src="${place.img}" alt="${place.title}" onerror="this.src='https://placehold.co/600x400/1e293b/ffffff?text=${place.title}'" class="w-full h-full object-cover transition duration-500 ${status ? '' : 'grayscale'}">
-              <div class="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent"></div>
+              <img src="${place.img}" alt="${place.title}" onerror="this.src='https://placehold.co/600x400/1e293b/ffffff?text=${place.title}'" class="w-full h-full object-cover transition duration-500 ${status ? '' : 'grayscale opacity-60'}">
+              <div class="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/50 to-transparent"></div>
             </div>
-            <div class="p-4 relative">
+            <div class="p-4 relative -mt-6">
               ${status 
-                ? `<span class="absolute -top-5 right-4 bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg"><i class="fa-solid fa-check mr-1"></i> Checked In</span>` 
-                : `<span class="absolute -top-5 right-4 bg-slate-700 text-slate-300 text-xs font-bold px-3 py-1 rounded-full shadow-lg">Pending</span>`
+                ? `<span class="absolute -top-10 right-4 bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg"><i class="fa-solid fa-check mr-1"></i> Checked In</span>` 
+                : `<span class="absolute -top-10 right-4 bg-slate-700 text-slate-300 text-xs font-bold px-3 py-1 rounded-full shadow-lg"><i class="fa-solid fa-lock mr-1"></i> Unexplored</span>`
               }
               <h2 class="text-xl font-bold mb-1">${place.title}</h2>
-              <p class="text-indigo-300 text-sm font-medium"><i class="fa-solid fa-camera mr-1"></i> Tap to scan & explore</p>
+              <p class="text-indigo-300 text-sm font-medium"><i class="fa-solid fa-camera mr-1"></i> Tap to scan & interact</p>
             </div>
           </div>
         `;
       });
-
-      if (checkAllCompleted()) {
-        document.getElementById('quiz-unlock-section').classList.remove('hidden');
-      }
     }
   </script>
 
   <!-- ========================================== -->
   <!-- SCREEN 2: GALLERY                          -->
   <!-- ========================================== -->
-  <div id="screen-gallery" class="ui-layer bg-slate-900 p-6 hidden">
+  <div id="screen-gallery" class="ui-layer bg-slate-900 p-6 hidden pb-24">
     <div class="max-w-md mx-auto mt-8 fade-in">
-      <button onclick="navigate('home')" class="mb-6 text-indigo-400 font-semibold"><i class="fa-solid fa-arrow-left mr-2"></i> Back Home</button>
       <h2 class="text-3xl font-bold mb-6">Your Memories</h2>
-      
       <div id="gallery-container" class="space-y-6">
         <!-- Injected via JS -->
       </div>
@@ -232,9 +232,11 @@
           hasPhotos = true;
           const place = placesData[key];
           container.innerHTML += `
-            <div class="glass p-3 rounded-2xl">
-              <img src="${appState[key].photo}" class="w-full rounded-xl border border-white/10 mb-3">
-              <h3 class="font-bold text-lg px-2"><i class="fa-solid fa-location-dot text-indigo-400 mr-2"></i> ${place.title}</h3>
+            <div class="glass p-3 rounded-2xl relative border border-white/10">
+              <span class="absolute top-5 right-5 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold shadow-lg text-white">
+                <i class="fa-solid fa-location-dot text-indigo-400 mr-1"></i> ${place.title}
+              </span>
+              <img src="${appState[key].photo}" class="w-full rounded-xl mb-3 shadow-md">
             </div>
           `;
         }
@@ -242,30 +244,37 @@
 
       if (!hasPhotos) {
         container.innerHTML = `
-          <div class="text-center text-slate-400 py-12">
-            <i class="fa-solid fa-camera-retro text-4xl mb-3 opacity-50"></i>
-            <p>No photos yet. Check in to places to build your gallery!</p>
+          <div class="text-center text-slate-400 py-16 glass rounded-2xl border border-white/5">
+            <i class="fa-solid fa-camera-retro text-5xl mb-4 opacity-30"></i>
+            <p class="text-sm px-6">Your gallery is empty.<br>Check in to places in AR to start building memories!</p>
           </div>
         `;
       }
     }
   </script>
 
-
   <!-- ========================================== -->
   <!-- SCREEN 3: AR OVERLAY UI                    -->
   <!-- ========================================== -->
-  <div id="screen-ar" class="ui-layer hidden pointer-events-none">
+  <div id="screen-ar" class="ui-layer hidden pointer-events-none z-[60]">
     
     <!-- Top Bar -->
-    <div class="p-4 flex justify-between items-start pointer-events-auto w-full max-w-md mx-auto">
+    <div class="p-4 flex justify-between items-start pointer-events-auto w-full max-w-md mx-auto absolute top-0 left-0 right-0 z-[70]">
       <button onclick="navigate('home')" class="glass-dark w-12 h-12 rounded-full flex items-center justify-center text-white active:scale-95 transition no-ar-touch shadow-lg">
-        <i class="fa-solid fa-times text-xl"></i>
+        <i class="fa-solid fa-arrow-left text-xl"></i>
       </button>
     </div>
 
-    <!-- Main AR Content Overlay -->
-    <div class="absolute bottom-0 left-0 w-full p-4 pb-8 pointer-events-auto no-ar-touch">
+    <!-- Scanning Overlay (Visible when tracking is lost) -->
+    <div id="scanning-overlay" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-[50]">
+      <div class="w-16 h-16 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mb-4"></div>
+      <div class="glass-dark px-6 py-2 rounded-full font-bold text-white shadow-lg shadow-black/50 animate-pulse">
+        <i class="fa-solid fa-crosshairs mr-2"></i> Scanning Marker...
+      </div>
+    </div>
+
+    <!-- Main AR Content Overlay (Hidden until marker found) -->
+    <div id="ar-ui-container" class="hidden absolute bottom-0 left-0 w-full p-4 pb-8 pointer-events-auto no-ar-touch z-[70]">
       <div class="max-w-md mx-auto relative">
         
         <!-- Toggle Button -->
@@ -279,22 +288,18 @@
         <!-- Info Card -->
         <div id="ar-info-card" class="glass-dark rounded-2xl p-5 mb-4 fade-in">
           <h2 id="ar-title" class="text-2xl font-bold mb-2 text-white">Loading...</h2>
-          <p id="ar-desc" class="text-slate-300 text-sm leading-relaxed mb-4">Scan the corresponding marker to view information.</p>
-          <div class="bg-indigo-900/50 border border-indigo-400/30 rounded-lg p-3 text-xs text-indigo-200 flex items-center">
-            <i class="fa-solid fa-circle-info text-indigo-400 mr-2 text-lg"></i> Point your camera at the real-world image marker.
-          </div>
+          <p id="ar-desc" class="text-slate-300 text-sm leading-relaxed mb-4">Description goes here.</p>
         </div>
 
         <!-- 3D Hint Card -->
         <div id="ar-3d-hint" class="glass-dark rounded-2xl p-4 mb-4 text-center hidden fade-in border-indigo-500/50">
-          <p class="text-sm font-medium text-indigo-200"><i class="fa-solid fa-hand-pointer mr-2"></i> Drag to rotate • Pinch to scale</p>
+          <p class="text-sm font-medium text-indigo-200"><i class="fa-solid fa-hand-pointer mr-2"></i> Drag empty space to rotate • Pinch to zoom</p>
         </div>
 
         <!-- Check-in Action -->
         <button onclick="checkInTarget()" class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold py-4 rounded-xl transition shadow-xl flex justify-center items-center active:scale-95">
           <i class="fa-solid fa-camera mr-2 text-xl"></i> Take Photo & Check In
         </button>
-
       </div>
     </div>
   </div>
@@ -306,8 +311,6 @@
       const tdBtn = document.getElementById('toggle-3d-btn');
       const infoCard = document.getElementById('ar-info-card');
       const tdHint = document.getElementById('ar-3d-hint');
-      
-      // Select the 3D Wrapper in A-Frame
       const wrapper3D = document.getElementById('ar-models-wrapper');
 
       if (mode === 'info') {
@@ -344,10 +347,8 @@
         return;
       }
 
-      // Hide AR UI temporarily for clean screenshot
       document.getElementById('screen-ar').style.display = 'none';
       
-      // Flash effect
       const flash = document.createElement('div');
       flash.className = 'fixed inset-0 bg-white z-[99999] transition-opacity duration-300';
       document.body.appendChild(flash);
@@ -377,16 +378,13 @@
         ctx.drawImage(video, startX, startY, drawWidth, drawHeight);
         ctx.drawImage(glCanvas, 0, 0, cw, ch);
 
-        const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.8); // 0.8 compression to fit in localStorage comfortably
+        const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.8);
 
-        // Update State
         appState[activeArPlace].checkedIn = true;
         appState[activeArPlace].photo = dataUrl;
         saveState();
 
         alert(`Successfully Checked In at ${placesData[activeArPlace].title}!`);
-        
-        // Hard navigation back home to gracefully kill AR camera
         window.location.href = window.location.pathname; 
       }, 50);
     }
@@ -395,33 +393,39 @@
   <!-- ========================================== -->
   <!-- SCREEN 4: QUIZ                             -->
   <!-- ========================================== -->
-  <div id="screen-quiz" class="ui-layer bg-slate-900 p-6 hidden">
+  <div id="screen-quiz" class="ui-layer bg-slate-900 p-6 hidden pb-24">
     <div class="max-w-md mx-auto mt-8 fade-in h-full flex flex-col">
       <div class="flex justify-between items-center mb-6">
-        <button onclick="navigate('home')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-times text-xl"></i></button>
-        <span class="bg-indigo-900 text-indigo-300 text-xs font-bold px-3 py-1 rounded-full">UTM Explorer Quiz</span>
+        <h2 class="text-3xl font-bold">Knowledge Quiz</h2>
       </div>
 
-      <!-- Quiz Content -->
-      <div id="quiz-question-container" class="flex-grow flex flex-col justify-center pb-20">
-        <div class="mb-4 text-indigo-400 font-bold text-sm tracking-widest uppercase">Question <span id="q-num">1</span> of 3</div>
+      <!-- Quiz Dashboard / History Screen -->
+      <div id="quiz-dash-container" class="flex-grow flex flex-col pb-10">
+         <!-- Injected via JS -->
+      </div>
+
+      <!-- Active Quiz Questions Screen -->
+      <div id="quiz-question-container" class="hidden flex-grow flex flex-col justify-center pb-10">
+        <div class="mb-4 text-indigo-400 font-bold text-sm tracking-widest uppercase flex justify-between items-center">
+          <span>Question <span id="q-num">1</span> of 3</span>
+          <button onclick="renderQuizDashboard()" class="text-slate-400 hover:text-white text-xs font-normal border border-white/20 px-3 py-1 rounded-full"><i class="fa-solid fa-times mr-1"></i> Cancel</button>
+        </div>
         <h2 id="q-text" class="text-2xl font-bold mb-8 leading-tight">Question text goes here?</h2>
-        
         <div id="q-options" class="space-y-3">
           <!-- Injected via JS -->
         </div>
       </div>
 
-      <!-- Score Screen -->
-      <div id="quiz-score-container" class="hidden flex-grow flex flex-col items-center justify-center pb-20 fade-in text-center">
+      <!-- Result/Score Screen -->
+      <div id="quiz-score-container" class="hidden flex-grow flex flex-col items-center justify-center pb-10 fade-in text-center">
         <div class="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-indigo-500/40">
           <i class="fa-solid fa-trophy text-4xl text-white"></i>
         </div>
         <h2 class="text-3xl font-bold mb-2">Quiz Complete!</h2>
         <p class="text-slate-300 mb-8">You scored <span id="score-display" class="font-bold text-indigo-400 text-xl">0/3</span></p>
         
-        <button onclick="navigate('home')" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-4 rounded-xl transition shadow-lg">
-          Return to Dashboard
+        <button onclick="renderQuizDashboard()" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-4 rounded-xl transition shadow-lg">
+          View Result History
         </button>
       </div>
 
@@ -429,10 +433,74 @@
   </div>
 
   <script>
-    function renderQuiz() {
-      document.getElementById('quiz-score-container').classList.add('hidden');
-      document.getElementById('quiz-question-container').classList.remove('hidden');
+    function renderQuizDashboard() {
+      const dash = document.getElementById('quiz-dash-container');
+      const qContainer = document.getElementById('quiz-question-container');
+      const scoreContainer = document.getElementById('quiz-score-container');
       
+      qContainer.classList.add('hidden');
+      scoreContainer.classList.add('hidden');
+      dash.classList.remove('hidden');
+
+      if (!checkAllCompleted()) {
+        dash.innerHTML = `
+          <div class="text-center py-12 glass-dark rounded-2xl border border-white/5">
+            <div class="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+              <i class="fa-solid fa-lock text-3xl text-slate-500"></i>
+            </div>
+            <h3 class="text-xl font-bold mb-2">Quiz Locked</h3>
+            <p class="text-slate-400 px-6 text-sm">Explore and Check-In at all locations on the Explore screen to unlock the quiz!</p>
+          </div>
+        `;
+      } else {
+        let historyHTML = '';
+        if (appState.quizHistory && appState.quizHistory.length > 0) {
+          historyHTML = `<h3 class="text-lg font-bold mt-8 mb-4 text-indigo-300">Attempt History</h3><div class="space-y-3">`;
+          
+          // Reverse loop to show newest attempts at the top
+          appState.quizHistory.slice().reverse().forEach(h => {
+            historyHTML += `
+              <div class="glass p-4 rounded-xl flex justify-between items-center border border-white/5">
+                <div>
+                  <div class="font-bold text-white mb-1">Attempt #${h.attempt}</div>
+                  <div class="text-xs text-slate-400"><i class="fa-regular fa-clock mr-1"></i> ${h.date}</div>
+                </div>
+                <div class="text-2xl font-bold ${h.score === h.total ? 'text-green-400' : 'text-indigo-400'}">${h.score}/${h.total}</div>
+              </div>
+            `;
+          });
+          historyHTML += `</div>`;
+        } else {
+          historyHTML = `<div class="text-center mt-8 py-8 glass rounded-2xl"><p class="text-slate-400 text-sm">No attempts yet.</p></div>`;
+        }
+
+        dash.innerHTML = `
+          <div class="text-center py-6 glass rounded-2xl border border-green-500/30">
+            <div class="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+              <i class="fa-solid fa-unlock-keyhole text-2xl text-green-400"></i>
+            </div>
+            <h3 class="font-bold text-xl mb-2 text-green-400">Quiz Unlocked!</h3>
+            <p class="text-sm text-slate-300 mb-4 px-4">Test your knowledge about UTM.</p>
+            <div class="px-6">
+              <button onclick="startQuiz()" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-indigo-500/30">
+                Start New Attempt
+              </button>
+            </div>
+          </div>
+          ${historyHTML}
+        `;
+      }
+    }
+
+    function startQuiz() {
+      document.getElementById('quiz-dash-container').classList.add('hidden');
+      document.getElementById('quiz-question-container').classList.remove('hidden');
+      currentQuizIndex = 0;
+      currentScore = 0;
+      renderQuizQuestion();
+    }
+
+    function renderQuizQuestion() {
       const q = quizData[currentQuizIndex];
       document.getElementById('q-num').innerText = currentQuizIndex + 1;
       document.getElementById('q-text').innerText = q.q;
@@ -443,7 +511,7 @@
       const labels = ['A', 'B', 'C', 'D'];
       q.options.forEach((opt, idx) => {
         optionsContainer.innerHTML += `
-          <button onclick="answerQuiz(${idx})" class="w-full text-left glass-dark hover:bg-white/10 p-4 rounded-xl transition flex items-center group">
+          <button onclick="answerQuiz(${idx})" class="w-full text-left glass-dark hover:bg-white/10 p-4 rounded-xl transition flex items-center group mb-3 shadow-md">
             <span class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center font-bold mr-4 group-hover:bg-indigo-500 group-hover:text-white transition">${labels[idx]}</span>
             <span class="font-medium">${opt}</span>
           </button>
@@ -458,14 +526,20 @@
       currentQuizIndex++;
       
       if (currentQuizIndex < quizData.length) {
-        renderQuiz();
+        renderQuizQuestion();
       } else {
-        // Show Score
+        // Save history results to Local Storage
+        const attempt = (appState.quizHistory ? appState.quizHistory.length : 0) + 1;
+        const now = new Date();
+        const dateStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        appState.quizHistory.push({ attempt, score: currentScore, total: quizData.length, date: dateStr });
+        saveState();
+
+        // Show Score screen
         document.getElementById('quiz-question-container').classList.add('hidden');
         document.getElementById('quiz-score-container').classList.remove('hidden');
         document.getElementById('score-display').innerText = `${currentScore}/${quizData.length}`;
-        currentQuizIndex = 0; // Reset for next time
-        currentScore = 0;
       }
     }
   </script>
@@ -477,10 +551,40 @@
     <!-- Injected dynamically to avoid WebGL lockups when not needed -->
   </div>
 
+  <!-- BOTTOM NAVIGATION BAR -->
+  <nav id="bottom-nav" class="fixed bottom-0 w-full bg-slate-900/95 backdrop-blur-md border-t border-white/10 flex justify-around p-2 z-[100] hidden" style="padding-bottom: env(safe-area-inset-bottom, 0.5rem);">
+    <button onclick="navigate('home')" id="nav-home" class="flex flex-col items-center p-2 text-indigo-400 w-1/3 transition">
+      <i class="fa-solid fa-house text-xl mb-1"></i>
+      <span class="text-xs font-semibold">Explore</span>
+    </button>
+    <button onclick="navigate('quiz')" id="nav-quiz" class="flex flex-col items-center p-2 text-slate-400 hover:text-indigo-300 w-1/3 transition">
+      <i class="fa-solid fa-clipboard-question text-xl mb-1"></i>
+      <span class="text-xs font-semibold">Quiz</span>
+    </button>
+    <button onclick="navigate('gallery')" id="nav-gallery" class="flex flex-col items-center p-2 text-slate-400 hover:text-indigo-300 w-1/3 transition">
+      <i class="fa-solid fa-images text-xl mb-1"></i>
+      <span class="text-xs font-semibold">Gallery</span>
+    </button>
+  </nav>
+
   <!-- ROUTING LOGIC -->
   <script>
+    function updateNavHighlight(page) {
+      const pages = ['home', 'quiz', 'gallery'];
+      pages.forEach(p => {
+        const btn = document.getElementById(`nav-${p}`);
+        if(!btn) return;
+        if (p === page) {
+          btn.classList.remove('text-slate-400');
+          btn.classList.add('text-indigo-400');
+        } else {
+          btn.classList.add('text-slate-400');
+          btn.classList.remove('text-indigo-400');
+        }
+      });
+    }
+
     function navigate(page, payload = null) {
-      // Clear URL params to ensure clean state on reloads, except for AR
       const url = new URL(window.location);
       url.search = ''; 
       
@@ -504,18 +608,26 @@
 
       const urlParams = new URLSearchParams(window.location.search);
       const target = urlParams.get('target');
-      const page = urlParams.get('page');
+      const page = urlParams.get('page') || 'home';
+
+      const bottomNav = document.getElementById('bottom-nav');
 
       if (target && placesData[target]) {
         // BOOT AR MODE
+        if(bottomNav) bottomNav.classList.add('hidden');
         activeArPlace = target;
+        
+        // Reset AR UI states
         document.getElementById('screen-ar').classList.remove('hidden');
+        document.getElementById('ar-ui-container').classList.add('hidden');
+        document.getElementById('scanning-overlay').classList.remove('hidden');
+
         document.getElementById('ar-container').classList.remove('hidden');
         
         // Setup Info UI
         document.getElementById('ar-title').innerText = placesData[target].title;
         document.getElementById('ar-desc').innerText = placesData[target].desc;
-        setArMode('info'); // Default to info mode
+        setArMode('info'); 
 
         // Inject A-Frame HTML safely
         document.getElementById('ar-container').innerHTML = `
@@ -538,18 +650,16 @@
 
             <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-            <a-entity mindar-image-target="targetIndex: 0">
+            <a-entity mindar-image-target="targetIndex: 0" marker-handler>
               <!-- WRAPPER FOR DRAG CONTROLS -->
               <a-entity id="ar-models-wrapper" drag-rotate-scale position="0 -0.3 0" scale="0.4 0.4 0.4" visible="false">
                 
                 <a-entity id="model-masjid" visible="${target === 'masjid' ? 'true' : 'false'}">
-                  <!-- Courtyard Base -->
                   <a-box position="0 0 0" width="3.0" height="0.05" depth="3.0" src="#tex-tile" repeat="8 8"></a-box>
                   <a-box position="0 0.15 1.45" width="3.0" height="0.3" depth="0.1" src="#tex-stone" repeat="6 1"></a-box>
                   <a-box position="0 0.15 -1.45" width="3.0" height="0.3" depth="0.1" src="#tex-stone" repeat="6 1"></a-box>
                   <a-box position="1.45 0.15 0" width="0.1" height="0.3" depth="2.8" src="#tex-stone" repeat="6 1"></a-box>
                   <a-box position="-1.45 0.15 0" width="0.1" height="0.3" depth="2.8" src="#tex-stone" repeat="6 1"></a-box>
-                  <!-- Main Building -->
                   <a-box position="0 0.45 0" width="1.6" height="0.8" depth="1.6" src="#tex-stone" repeat="4 2"></a-box>
                   <a-cylinder position="0 1.0 0" radius="0.9" height="0.3" segments-radial="8" src="#tex-stone" repeat="3 1"></a-cylinder>
                   <a-plane position="0.81 0.45 0.4" width="0.2" height="0.4" rotation="0 90 0" src="#tex-window"></a-plane>
@@ -558,18 +668,15 @@
                   <a-plane position="-0.81 0.45 -0.4" width="0.2" height="0.4" rotation="0 -90 0" src="#tex-window"></a-plane>
                   <a-plane position="0.4 0.45 -0.81" width="0.2" height="0.4" rotation="0 180 0" src="#tex-window"></a-plane>
                   <a-plane position="-0.4 0.45 -0.81" width="0.2" height="0.4" rotation="0 180 0" src="#tex-window"></a-plane>
-                  <!-- Dome -->
                   <a-cylinder position="0 1.25 0" radius="0.6" height="0.25" src="#tex-stone" repeat="4 1"></a-cylinder>
                   <a-sphere position="0 1.35 0" radius="0.6" src="#tex-dome" repeat="8 4" theta-length="180" material="roughness: 0.3; metalness: 0.2"></a-sphere>
                   <a-cylinder position="0 2.1 0" radius="0.02" height="0.3" color="#fbbf24" material="metalness: 0.8"></a-cylinder>
                   <a-torus position="0 2.3 0" radius="0.08" radius-tubular="0.015" arc="180" color="#fbbf24" rotation="0 90 90" material="metalness: 0.8"></a-torus>
-                  <!-- Entrance -->
                   <a-entity position="0 0.02 0.8">
                     <a-box position="0 0.4 0.05" width="0.7" height="0.8" depth="0.1" src="#tex-stone"></a-box>
                     <a-box position="0 0.35 0.11" width="0.4" height="0.7" depth="0.05" color="#0f172a"></a-box>
                     <a-cylinder position="0 0.7 0.11" radius="0.2" height="0.05" rotation="90 0 0" color="#0f172a" theta-length="180"></a-cylinder>
                   </a-entity>
-                  <!-- 4 Minarets (Simplified for code brevity) -->
                   <a-entity position="-1.2 0 1.2"><a-box position="0 0.4 0" width="0.3" height="0.8" depth="0.3" src="#tex-stone"></a-box><a-cylinder position="0 1.2 0" radius="0.12" height="0.8" src="#tex-marble"></a-cylinder><a-sphere position="0 1.6 0" radius="0.12" src="#tex-dome" theta-length="180"></a-sphere></a-entity>
                   <a-entity position="1.2 0 1.2"><a-box position="0 0.4 0" width="0.3" height="0.8" depth="0.3" src="#tex-stone"></a-box><a-cylinder position="0 1.2 0" radius="0.12" height="0.8" src="#tex-marble"></a-cylinder><a-sphere position="0 1.6 0" radius="0.12" src="#tex-dome" theta-length="180"></a-sphere></a-entity>
                   <a-entity position="-1.2 0 -1.2"><a-box position="0 0.4 0" width="0.3" height="0.8" depth="0.3" src="#tex-stone"></a-box><a-cylinder position="0 1.2 0" radius="0.12" height="0.8" src="#tex-marble"></a-cylinder><a-sphere position="0 1.6 0" radius="0.12" src="#tex-dome" theta-length="180"></a-sphere></a-entity>
@@ -577,37 +684,20 @@
                 </a-entity>
 
                 <a-entity id="model-fc" visible="${target === 'fc' ? 'true' : 'false'}" position="0 0.2 0">
-                  <!-- Ground -->
                   <a-box position="0 -0.05 0" width="3" height="0.1" depth="2" color="#475569"></a-box>
-                  
-                  <!-- Main Center Block (N28) -->
                   <a-box position="0 0.6 -0.3" width="1.2" height="1.2" depth="0.8" src="#tex-fc-window" repeat="2 3"></a-box>
-                  
-                  <!-- Top N28 Sign Structure -->
                   <a-box position="0 1.3 -0.3" width="0.6" height="0.25" depth="0.4" src="#tex-fc-grey"></a-box>
                   <a-text value="N28" position="0 1.3 -0.09" align="center" color="#1e293b" scale="0.8 0.8 0.8"></a-text>
-
-                  <!-- Left Wing -->
                   <a-box position="-1.0 0.45 -0.2" width="0.8" height="0.9" depth="0.6" src="#tex-fc-window" repeat="1.5 2"></a-box>
-                  
-                  <!-- Right Wing -->
                   <a-box position="1.0 0.45 -0.2" width="0.8" height="0.9" depth="0.6" src="#tex-fc-window" repeat="1.5 2"></a-box>
-                  
-                  <!-- Connecting Bridges -->
                   <a-box position="-0.6 0.7 -0.1" width="0.4" height="0.3" depth="0.5" src="#tex-fc-grey"></a-box>
                   <a-box position="0.6 0.7 -0.1" width="0.4" height="0.3" depth="0.5" src="#tex-fc-grey"></a-box>
-
-                  <!-- Iconic Red/Orange Entrance Roof -->
                   <a-box position="0 0.45 0.4" width="1.4" height="0.08" depth="0.8" rotation="10 0 0" color="#ef4444"></a-box>
                   <a-box position="0 0.52 0.35" width="1.4" height="0.03" depth="0.8" rotation="10 0 0" color="#b91c1c"></a-box>
-                  
-                  <!-- Orange Entrance Pillars -->
                   <a-cylinder position="-0.5 0.2 0.6" radius="0.06" height="0.4" color="#f97316"></a-cylinder>
                   <a-cylinder position="0.5 0.2 0.6" radius="0.06" height="0.4" color="#f97316"></a-cylinder>
                   <a-cylinder position="-0.5 0.2 0.1" radius="0.06" height="0.4" color="#f97316"></a-cylinder>
                   <a-cylinder position="0.5 0.2 0.1" radius="0.06" height="0.4" color="#f97316"></a-cylinder>
-
-                  <!-- Entrance Stairs -->
                   <a-box position="0 0.05 0.3" width="0.8" height="0.1" depth="0.6" color="#94a3b8"></a-box>
                   <a-box position="0 0.15 0.2" width="0.8" height="0.1" depth="0.4" color="#64748b"></a-box>
                   <a-box position="0 0.25 0.1" width="0.8" height="0.1" depth="0.2" color="#475569"></a-box>
@@ -618,17 +708,21 @@
           </a-scene>
         `;
 
-      } else if (page === 'gallery') {
-        document.getElementById('screen-gallery').classList.remove('hidden');
-        renderGallery();
-      } else if (page === 'quiz') {
-        document.getElementById('screen-quiz').classList.remove('hidden');
-        currentQuizIndex = 0; currentScore = 0;
-        renderQuiz();
       } else {
-        // HOME MODE
-        document.getElementById('screen-home').classList.remove('hidden');
-        renderHome();
+        // GENERAL WEB MODE
+        if(bottomNav) bottomNav.classList.remove('hidden');
+        updateNavHighlight(page);
+
+        if (page === 'gallery') {
+          document.getElementById('screen-gallery').classList.remove('hidden');
+          renderGallery();
+        } else if (page === 'quiz') {
+          document.getElementById('screen-quiz').classList.remove('hidden');
+          renderQuizDashboard();
+        } else {
+          document.getElementById('screen-home').classList.remove('hidden');
+          renderHome();
+        }
       }
     }
 
