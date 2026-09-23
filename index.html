@@ -272,13 +272,14 @@
     <!-- Scanning Overlay (Visible when tracking is lost) -->
     <div id="scanning-overlay" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-[50]">
       <div class="w-16 h-16 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mb-4"></div>
-      <div class="glass-dark px-6 py-2 rounded-full font-bold text-white shadow-lg shadow-black/50 animate-pulse">
-        <i class="fa-solid fa-crosshairs mr-2"></i> Scanning Marker...
+      <div class="glass-dark px-6 py-2 rounded-full font-bold text-white shadow-lg shadow-black/50 animate-pulse text-center">
+        <i class="fa-solid fa-crosshairs mr-2"></i> Scanning Marker...<br>
+        <span id="scanning-target-name" class="text-sm text-indigo-300 font-normal"></span>
       </div>
     </div>
 
     <!-- Main AR Content Overlay (Hidden until marker found) -->
-    <div id="ar-ui-container" class="hidden absolute bottom-0 left-0 w-full p-4 pb-8 pointer-events-auto no-ar-touch z-[70]">
+    <div id="ar-ui-container" class="hidden absolute bottom-0 left-0 w-full p-4 pb-20 pointer-events-auto no-ar-touch z-[70]">
       <div class="max-w-md mx-auto relative">
         
         <!-- Toggle Button -->
@@ -625,6 +626,9 @@
         document.getElementById('screen-ar').classList.remove('hidden');
         document.getElementById('ar-ui-container').classList.add('hidden');
         document.getElementById('scanning-overlay').classList.remove('hidden');
+        
+        // Update scanning text
+        document.getElementById('scanning-target-name').innerText = "Look for " + placesData[target].title;
 
         document.getElementById('ar-container').classList.remove('hidden');
         
