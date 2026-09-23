@@ -219,7 +219,7 @@
   <div id="screen-gallery" class="ui-layer bg-slate-900 p-6 hidden pb-24">
     <div class="max-w-md mx-auto mt-8 fade-in">
       <h2 class="text-3xl font-bold mb-6">Your Memories</h2>
-      <div id="gallery-container" class="space-y-6">
+      <div id="gallery-container" class="grid grid-cols-2 gap-4">
         <!-- Injected via JS -->
       </div>
     </div>
@@ -236,11 +236,11 @@
           hasPhotos = true;
           const place = placesData[key];
           container.innerHTML += `
-            <div class="glass p-3 rounded-2xl relative border border-white/10">
-              <span class="absolute top-5 right-5 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold shadow-lg text-white">
+            <div class="glass p-2 rounded-xl relative border border-white/10 group">
+              <span class="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-2 py-1 rounded-md text-[10px] leading-tight font-bold shadow-lg text-white max-w-[85%] truncate pointer-events-none">
                 <i class="fa-solid fa-location-dot text-indigo-400 mr-1"></i> ${place.title}
               </span>
-              <img src="${appState[key].photo}" class="w-full rounded-xl mb-3 shadow-md">
+              <img src="${appState[key].photo}" class="w-full h-48 object-cover rounded-lg shadow-md transition transform group-hover:scale-[1.02]">
             </div>
           `;
         }
@@ -248,7 +248,7 @@
 
       if (!hasPhotos) {
         container.innerHTML = `
-          <div class="text-center text-slate-400 py-16 glass rounded-2xl border border-white/5">
+          <div class="col-span-2 text-center text-slate-400 py-16 glass rounded-2xl border border-white/5">
             <i class="fa-solid fa-camera-retro text-5xl mb-4 opacity-30"></i>
             <p class="text-sm px-6">Your gallery is empty.<br>Check in to places in AR to start building memories!</p>
           </div>
