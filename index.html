@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Masjid Web AR Experience</title>
 
-  <!-- A-Frame VR/AR framework (Updated to 1.4.2 for better stability) -->
+  <!-- A-Frame VR/AR framework -->
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js" crossorigin="anonymous"></script>
   
   <!-- MindAR library for image tracking in A-Frame -->
@@ -42,18 +42,16 @@
         }
       },
       OnTouchMove: function (e) {
-        if(e.target.id === 'start-btn') return;
+        if(e.target.closest('#controls-container') || e.target.id === 'start-btn') return;
         
         if (this.ifMouseDown && e.touches.length === 1) {
           e.preventDefault();
           var temp_x = e.touches[0].clientX - this.x_cord;
           var temp_y = e.touches[0].clientY - this.y_cord;
           
-          // Adjusted rotation to exactly follow finger drag direction
           this.el.object3D.rotation.y += temp_x * this.data.speed * 0.005;
           this.el.object3D.rotation.x += temp_y * this.data.speed * 0.005;
           
-          // Clamp vertical tilt between -45 and +45 degrees so it doesn't flip upside down
           this.el.object3D.rotation.x = Math.max(-Math.PI/4, Math.min(Math.PI/4, this.el.object3D.rotation.x));
           
           this.x_cord = e.touches[0].clientX;
@@ -65,11 +63,9 @@
             e.touches[0].clientY - e.touches[1].clientY
           );
           
-          // Smooth scaling based on finger pinch distance
           var scaleFactor = currentDistance / this.initialDistance;
           var newScale = this.initialScale * scaleFactor;
           
-          // Limit zoom out (0.1) and zoom in (3.0)
           newScale = Math.max(0.1, Math.min(newScale, 3.0));
           this.el.object3D.scale.set(newScale, newScale, newScale);
         }
@@ -137,11 +133,11 @@
 
     #ui-container {
       position: absolute;
-      bottom: 60px; /* Moved up to prevent phone browser bars from hiding it */
+      bottom: 60px;
       left: 0;
       width: 100%;
       text-align: center;
-      z-index: 99999; /* Massive z-index to ensure it sits on top of AR */
+      z-index: 99999;
       pointer-events: none;
     }
     
@@ -159,14 +155,13 @@
 
     #controls-container {
       position: absolute;
-      bottom: 60px; /* Moved up */
+      bottom: 0px; 
       left: 0;
       width: 100%;
       display: flex;
       justify-content: center;
       align-items: center;
       gap: 20px;
-      z-index: 99999; /* Massive z-index */
       pointer-events: auto;
     }
 
@@ -206,7 +201,7 @@
       position: absolute;
       top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(0,0,0,0.9);
-      z-index: 10000;
+      z-index: 100000;
       flex-direction: column;
       justify-content: center;
       align-items: center;
@@ -232,8 +227,6 @@
   </style>
 
   <script>
-    // This catches unhandled rejections and extracts the real error message 
-    // instead of showing a cryptic object. Helpful for catching missing files.
     window.addEventListener('unhandledrejection', function(event) {
       console.warn("Caught unhandled promise rejection. This usually means a file (.mind, .glb) is missing.", event.reason || event);
       event.preventDefault(); 
@@ -250,11 +243,10 @@
       const galleryModal = document.getElementById("gallery-modal");
       const closeGalleryBtn = document.getElementById("close-gallery");
       const galleryImage = document.getElementById("gallery-image");
+      const uiContainer = document.getElementById("ui-container");
 
       startBtn.addEventListener("click", function() {
         startScreen.style.display = "none";
-
-        // Start the MindAR Engine manually now that we have user interaction
         const arSystem = sceneEl.systems["mindar-image-system"];
         if(arSystem) {
             arSystem.start().catch((err) => {
@@ -264,16 +256,23 @@
         }
       });
 
-      // 1. Flip Camera Logic
+      // 1. Flip Camera Logic (Safely handled)
       flipBtn.addEventListener("click", function() {
         const arSystem = sceneEl.systems["mindar-image-system"];
         if(arSystem) {
-          // MindAR built-in function to swap between front/back camera
-          arSystem.switchCamera(); 
+          try {
+            if (typeof arSystem.switchCamera === 'function') {
+                arSystem.switchCamera();
+            } else {
+                alert("Your browser/device does not support flipping the camera in this mode.");
+            }
+          } catch(e) {
+            alert("Error switching camera. Front camera might be restricted.");
+          }
         }
       });
 
-      // 2. Capture Photo Logic
+      // 2. Capture Photo Logic (Correctly merging Video + 3D, Hiding UI, Naming file)
       captureBtn.addEventListener("click", function() {
         const video = document.querySelector('video');
         const glCanvas = sceneEl.canvas;
@@ -283,36 +282,88 @@
           return;
         }
 
-        // Create a temporary canvas to merge the video feed and the 3D model
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = video.videoWidth;
-        tempCanvas.height = video.videoHeight;
-        const ctx = tempCanvas.getContext('2d');
+        // HIDE THE UI
+        uiContainer.style.display = "none";
 
-        // Draw camera video first
-        ctx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
-        
-        // Draw the 3D AR layer on top
-        ctx.drawImage(glCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
+        // Create Flash Effect
+        const flash = document.createElement('div');
+        flash.style.position = 'absolute';
+        flash.style.top = '0'; flash.style.left = '0';
+        flash.style.width = '100%'; flash.style.height = '100%';
+        flash.style.backgroundColor = 'white';
+        flash.style.zIndex = '999999';
+        document.body.appendChild(flash);
 
-        // Convert the merged canvas to a JPG image URL
-        const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.9);
+        // Wait a tiny bit for the UI to disappear before capturing
+        setTimeout(() => {
+          // Fade out the flash
+          flash.style.transition = 'opacity 0.5s';
+          flash.style.opacity = '0';
+          setTimeout(() => flash.remove(), 500);
 
-        // Trigger Download to Phone Album
-        const link = document.createElement('a');
-        link.download = 'masjid-ar-snapshot.jpg';
-        link.href = dataUrl;
-        link.click(); // Automates the download prompt
+          // Setup merging canvas
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = glCanvas.width;
+          tempCanvas.height = glCanvas.height;
+          const ctx = tempCanvas.getContext('2d');
 
-        // Save to browser "Cookie" (LocalStorage)
-        try {
-          localStorage.setItem('savedMasjidSnapshot', dataUrl);
-          // Visual feedback that photo was taken
-          captureBtn.style.background = "#4ade80"; // Turn green briefly
-          setTimeout(() => { captureBtn.style.background = "rgba(255, 255, 255, 0.9)"; }, 500);
-        } catch (e) {
-          console.warn("Could not save to LocalStorage (possibly out of space)", e);
-        }
+          // Calculate aspect ratios to prevent zooming or squishing the video
+          const vw = video.videoWidth;
+          const vh = video.videoHeight;
+          const cw = glCanvas.width;
+          const ch = glCanvas.height;
+          const vRatio = vw / vh;
+          const cRatio = cw / ch;
+          
+          let drawWidth, drawHeight, startX, startY;
+          if (vRatio > cRatio) {
+             drawHeight = ch;
+             drawWidth = vw * (ch / vh);
+             startX = (cw - drawWidth) / 2;
+             startY = 0;
+          } else {
+             drawWidth = cw;
+             drawHeight = vh * (cw / vw);
+             startX = 0;
+             startY = (ch - drawHeight) / 2;
+          }
+
+          // Draw the video background perfectly sized
+          ctx.drawImage(video, startX, startY, drawWidth, drawHeight);
+          
+          // Draw the 3D AR layer on top
+          ctx.drawImage(glCanvas, 0, 0, cw, ch);
+
+          // Convert to JPG
+          const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.9);
+
+          // Generate custom Filename (Masjid_YYYYMMDD_HHMMSS)
+          const now = new Date();
+          const timestamp = now.getFullYear().toString() + 
+                           (now.getMonth()+1).toString().padStart(2,'0') + 
+                           now.getDate().toString().padStart(2,'0') + '_' + 
+                           now.getHours().toString().padStart(2,'0') + 
+                           now.getMinutes().toString().padStart(2,'0') + 
+                           now.getSeconds().toString().padStart(2,'0');
+          const fileName = 'Masjid_' + timestamp + '.jpg';
+
+          // Trigger Download
+          const link = document.createElement('a');
+          link.download = fileName;
+          link.href = dataUrl;
+          link.click();
+
+          // Save to browser LocalStorage for Gallery
+          try {
+            localStorage.setItem('savedMasjidSnapshot', dataUrl);
+          } catch (e) {
+            console.warn("Could not save to LocalStorage (possibly out of space)", e);
+          }
+
+          // RESTORE THE UI
+          uiContainer.style.display = "block";
+
+        }, 50); // Small delay to guarantee UI is hidden in the frame
       });
 
       // 3. Gallery Logic
@@ -389,19 +440,15 @@
         
         <!-- === COURTYARD BASE === -->
         <a-box position="0 0 0" width="3.0" height="0.05" depth="3.0" src="#tex-tile" repeat="8 8" shadow></a-box>
-        <!-- Courtyard Outer Walls -->
         <a-box position="0 0.15 1.45" width="3.0" height="0.3" depth="0.1" src="#tex-stone" repeat="6 1"></a-box>
         <a-box position="0 0.15 -1.45" width="3.0" height="0.3" depth="0.1" src="#tex-stone" repeat="6 1"></a-box>
         <a-box position="1.45 0.15 0" width="0.1" height="0.3" depth="2.8" src="#tex-stone" repeat="6 1"></a-box>
         <a-box position="-1.45 0.15 0" width="0.1" height="0.3" depth="2.8" src="#tex-stone" repeat="6 1"></a-box>
 
         <!-- === MAIN BUILDING === -->
-        <!-- First Tier -->
         <a-box position="0 0.45 0" width="1.6" height="0.8" depth="1.6" src="#tex-stone" repeat="4 2"></a-box>
-        <!-- Second Tier (Octagonal Base) -->
         <a-cylinder position="0 1.0 0" radius="0.9" height="0.3" segments-radial="8" src="#tex-stone" repeat="3 1"></a-cylinder>
 
-        <!-- Windows on Main Building -->
         <a-plane position="0.81 0.45 0.4" width="0.2" height="0.4" rotation="0 90 0" src="#tex-window"></a-plane>
         <a-plane position="0.81 0.45 -0.4" width="0.2" height="0.4" rotation="0 90 0" src="#tex-window"></a-plane>
         <a-plane position="-0.81 0.45 0.4" width="0.2" height="0.4" rotation="0 -90 0" src="#tex-window"></a-plane>
@@ -410,34 +457,27 @@
         <a-plane position="-0.4 0.45 -0.81" width="0.2" height="0.4" rotation="0 180 0" src="#tex-window"></a-plane>
 
         <!-- === DOME STRUCTURE === -->
-        <!-- Main Dome Drum -->
         <a-cylinder position="0 1.25 0" radius="0.6" height="0.25" src="#tex-stone" repeat="4 1"></a-cylinder>
-        <!-- Main Emerald Dome -->
         <a-sphere position="0 1.35 0" radius="0.6" src="#tex-dome" repeat="8 4" theta-length="180" material="roughness: 0.3; metalness: 0.2"></a-sphere>
-        <!-- Main Finial -->
         <a-cylinder position="0 2.1 0" radius="0.02" height="0.3" color="#fbbf24" material="metalness: 0.8"></a-cylinder>
         <a-torus position="0 2.3 0" radius="0.08" radius-tubular="0.015" arc="180" color="#fbbf24" rotation="0 90 90" material="metalness: 0.8"></a-torus>
 
-        <!-- 4 Small Corner Domes on Main Building -->
-        <!-- Front Left -->
+        <!-- 4 Small Corner Domes -->
         <a-entity position="-0.7 0.9 0.7">
           <a-cylinder position="0 0 0" radius="0.15" height="0.1" src="#tex-stone"></a-cylinder>
           <a-sphere position="0 0.05 0" radius="0.15" src="#tex-dome" theta-length="180"></a-sphere>
           <a-cylinder position="0 0.3 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder>
         </a-entity>
-        <!-- Front Right -->
         <a-entity position="0.7 0.9 0.7">
           <a-cylinder position="0 0 0" radius="0.15" height="0.1" src="#tex-stone"></a-cylinder>
           <a-sphere position="0 0.05 0" radius="0.15" src="#tex-dome" theta-length="180"></a-sphere>
           <a-cylinder position="0 0.3 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder>
         </a-entity>
-        <!-- Back Left -->
         <a-entity position="-0.7 0.9 -0.7">
           <a-cylinder position="0 0 0" radius="0.15" height="0.1" src="#tex-stone"></a-cylinder>
           <a-sphere position="0 0.05 0" radius="0.15" src="#tex-dome" theta-length="180"></a-sphere>
           <a-cylinder position="0 0.3 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder>
         </a-entity>
-        <!-- Back Right -->
         <a-entity position="0.7 0.9 -0.7">
           <a-cylinder position="0 0 0" radius="0.15" height="0.1" src="#tex-stone"></a-cylinder>
           <a-sphere position="0 0.05 0" radius="0.15" src="#tex-dome" theta-length="180"></a-sphere>
@@ -446,32 +486,25 @@
 
         <!-- === ENTRANCE (IWAN) === -->
         <a-entity position="0 0.02 0.8">
-          <!-- Main entrance block -->
           <a-box position="0 0.4 0.05" width="0.7" height="0.8" depth="0.1" src="#tex-stone"></a-box>
-          <!-- Hollow Arch illusion -->
           <a-box position="0 0.35 0.11" width="0.4" height="0.7" depth="0.05" color="#0f172a"></a-box>
           <a-cylinder position="0 0.7 0.11" radius="0.2" height="0.05" rotation="90 0 0" color="#0f172a" theta-length="180"></a-cylinder>
-          <!-- Decorative Pillars -->
           <a-cylinder position="-0.25 0.4 0.12" radius="0.04" height="0.8" src="#tex-marble"></a-cylinder>
           <a-cylinder position="0.25 0.4 0.12" radius="0.04" height="0.8" src="#tex-marble"></a-cylinder>
         </a-entity>
 
-        <!-- === 4 MINARETS (High Detail) === -->
-        <!-- Function-like structure applied to 4 corners -->
-        
-        <!-- Minaret 1: Front Left -->
+        <!-- === 4 MINARETS === -->
         <a-entity position="-1.2 0 1.2">
           <a-box position="0 0.4 0" width="0.3" height="0.8" depth="0.3" src="#tex-stone"></a-box>
           <a-cylinder position="0 1.2 0" radius="0.12" height="0.8" src="#tex-marble"></a-cylinder>
-          <a-cylinder position="0 1.6 0" radius="0.18" height="0.05" src="#tex-stone"></a-cylinder> <!-- Balcony 1 -->
+          <a-cylinder position="0 1.6 0" radius="0.18" height="0.05" src="#tex-stone"></a-cylinder>
           <a-cylinder position="0 1.9 0" radius="0.1" height="0.6" src="#tex-marble"></a-cylinder>
-          <a-cylinder position="0 2.2 0" radius="0.15" height="0.05" src="#tex-stone"></a-cylinder> <!-- Balcony 2 -->
+          <a-cylinder position="0 2.2 0" radius="0.15" height="0.05" src="#tex-stone"></a-cylinder>
           <a-cylinder position="0 2.4 0" radius="0.08" height="0.4" src="#tex-marble"></a-cylinder>
           <a-sphere position="0 2.6 0" radius="0.1" src="#tex-dome" theta-length="180"></a-sphere>
           <a-cylinder position="0 2.75 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder>
         </a-entity>
 
-        <!-- Minaret 2: Front Right -->
         <a-entity position="1.2 0 1.2">
           <a-box position="0 0.4 0" width="0.3" height="0.8" depth="0.3" src="#tex-stone"></a-box>
           <a-cylinder position="0 1.2 0" radius="0.12" height="0.8" src="#tex-marble"></a-cylinder>
@@ -483,7 +516,6 @@
           <a-cylinder position="0 2.75 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder>
         </a-entity>
 
-        <!-- Minaret 3: Back Left -->
         <a-entity position="-1.2 0 -1.2">
           <a-box position="0 0.4 0" width="0.3" height="0.8" depth="0.3" src="#tex-stone"></a-box>
           <a-cylinder position="0 1.2 0" radius="0.12" height="0.8" src="#tex-marble"></a-cylinder>
@@ -495,7 +527,6 @@
           <a-cylinder position="0 2.75 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder>
         </a-entity>
 
-        <!-- Minaret 4: Back Right -->
         <a-entity position="1.2 0 -1.2">
           <a-box position="0 0.4 0" width="0.3" height="0.8" depth="0.3" src="#tex-stone"></a-box>
           <a-cylinder position="0 1.2 0" radius="0.12" height="0.8" src="#tex-marble"></a-cylinder>
