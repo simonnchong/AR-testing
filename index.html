@@ -3,15 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Masjid Web AR Experience</title>
+  <title>UTM Explorer AR</title>
+
+  <!-- Tailwind CSS for Modern UI -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome for Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
   <!-- A-Frame VR/AR framework -->
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js" crossorigin="anonymous"></script>
   
   <!-- MindAR library for image tracking in A-Frame -->
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js" crossorigin="anonymous"></script>
-  
-  <!-- Custom Touch Rotation & Scaling Script -->
+
   <script>
     AFRAME.registerComponent('drag-rotate-scale', {
       schema: { speed: { default: 1.5 } },
@@ -27,6 +31,7 @@
         document.addEventListener('touchend', this.OnTouchEnd.bind(this));
       },
       OnTouchStart: function (e) {
+        if(document.getElementById('ar-ui-layer').classList.contains('hidden')) return; // Don't interact if AR UI is hidden
         if (e.touches.length === 1) {
           this.ifMouseDown = true;
           this.x_cord = e.touches[0].clientX;
@@ -41,18 +46,16 @@
         }
       },
       OnTouchMove: function (e) {
-        // Prevent rotating if we are touching a button
-        if(e.target.closest('#controls-container') || e.target.id === 'start-btn') return;
+        if(document.getElementById('ar-ui-layer').classList.contains('hidden')) return;
+        if(e.target.closest('.no-ar-touch')) return; // Prevent rotation when touching UI buttons
         
         if (this.ifMouseDown && e.touches.length === 1) {
           e.preventDefault();
           var temp_x = e.touches[0].clientX - this.x_cord;
           var temp_y = e.touches[0].clientY - this.y_cord;
-          
           this.el.object3D.rotation.y += temp_x * this.data.speed * 0.005;
           this.el.object3D.rotation.x += temp_y * this.data.speed * 0.005;
           this.el.object3D.rotation.x = Math.max(-Math.PI/4, Math.min(Math.PI/4, this.el.object3D.rotation.x));
-          
           this.x_cord = e.touches[0].clientX;
           this.y_cord = e.touches[0].clientY;
         } else if (e.touches.length === 2) {
@@ -61,320 +64,578 @@
             e.touches[0].clientX - e.touches[1].clientX,
             e.touches[0].clientY - e.touches[1].clientY
           );
-          
           var scaleFactor = currentDistance / this.initialDistance;
           var newScale = this.initialScale * scaleFactor;
-          
           newScale = Math.max(0.1, Math.min(newScale, 3.0));
           this.el.object3D.scale.set(newScale, newScale, newScale);
         }
       },
-      OnTouchEnd: function () {
-        this.ifMouseDown = false;
-      }
+      OnTouchEnd: function () { this.ifMouseDown = false; }
+    });
+
+    window.addEventListener('unhandledrejection', function(event) {
+      console.warn("Caught Promise Rejection (Likely Camera/MindAR init).", event.reason || event);
+      event.preventDefault(); 
     });
   </script>
 
   <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-      font-family: 'Inter', sans-serif;
-      background-color: #000;
-    }
+    body { font-family: 'Inter', sans-serif; background-color: #0f172a; margin: 0; overflow: hidden; }
+    /* Glassmorphism utility */
+    .glass { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2); }
+    .glass-dark { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
     
-    #start-screen {
-      position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background-color: rgba(15, 23, 42, 0.9);
-      z-index: 9999;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      color: white;
-      backdrop-filter: blur(10px);
-    }
-
-    #start-screen h1 { margin-bottom: 10px; font-size: 28px; }
-    #start-screen p { margin-bottom: 30px; font-size: 16px; color: #cbd5e1; text-align: center; max-width: 80%; }
-
-    #start-btn {
-      background-color: #3b82f6; color: white; border: none; padding: 15px 35px;
-      font-size: 18px; font-weight: bold; border-radius: 30px; cursor: pointer;
-      box-shadow: 0 4px 15px rgba(59, 130, 246, 0.5); transition: transform 0.2s;
-    }
-
-    #start-btn:active { transform: scale(0.95); }
-
-    /* Higher UI Container so buttons aren't blocked by mobile browser bars */
-    #ui-container {
-      position: absolute; bottom: 80px; left: 0; width: 100%;
-      text-align: center; z-index: 99999; pointer-events: none;
-    }
+    /* Smooth transitions */
+    .fade-in { animation: fadeIn 0.4s ease-in-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     
-    .instruction-badge {
-      display: inline-block; background: rgba(0, 0, 0, 0.7); color: white;
-      padding: 10px 20px; border-radius: 20px; font-size: 14px;
-      backdrop-filter: blur(5px); box-shadow: 0 4px 6px rgba(0,0,0,0.3); margin-bottom: 20px;
-    }
-
-    #controls-container {
-      display: flex; justify-content: center; align-items: center; gap: 20px; pointer-events: auto;
-    }
-
-    .control-btn {
-      background: rgba(15, 23, 42, 0.8); color: white; border: 2px solid rgba(255, 255, 255, 0.2);
-      border-radius: 50%; width: 50px; height: 50px; display: flex;
-      justify-content: center; align-items: center; font-size: 20px; cursor: pointer; backdrop-filter: blur(5px);
-    }
-
-    .control-btn:active { transform: scale(0.9); }
-    .capture-btn { width: 65px; height: 65px; background: rgba(255, 255, 255, 0.9); border: 4px solid #3b82f6; color: #3b82f6; font-size: 24px; }
-
-    #gallery-modal {
-      display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.9); z-index: 100000; flex-direction: column; justify-content: center; align-items: center;
-    }
-    #gallery-image { max-width: 90%; max-height: 70%; border-radius: 10px; border: 2px solid white; margin-bottom: 20px; }
-    .close-btn { background: #ef4444; color: white; padding: 10px 30px; border-radius: 20px; border: none; font-size: 16px; font-weight: bold; }
+    /* A-Frame container fixes */
+    #ar-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+    .ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 50; overflow-y: auto; }
   </style>
+</head>
+<body class="text-white">
 
   <script>
-    window.addEventListener('unhandledrejection', function(event) {
-      console.warn("Caught unhandled promise rejection. This usually means a file is missing.", event.reason || event);
-      event.preventDefault(); 
-    });
+    // Database for locations
+    const placesData = {
+      masjid: {
+        id: 'masjid',
+        title: 'Masjid Sultan Ismail',
+        desc: 'The beautiful Sultan Ismail Mosque is the spiritual heart of UTM Johor Bahru. Known for its stunning Islamic architecture, it accommodates thousands of congregants and serves as a center for community and spiritual growth.',
+        img: 'masjid.jpg',
+        mindFile: 'masjid.mind'
+      },
+      fc: {
+        id: 'fc',
+        title: 'Faculty of Computing',
+        desc: 'Formerly known as FSKSM, the Faculty of Computing is located at Block N28. It is UTM\'s premier hub for software engineering, computer science, and IT, fostering the next generation of tech innovators.',
+        img: 'fc.jpg',
+        mindFile: 'fc.mind'
+      }
+    };
 
-    document.addEventListener("DOMContentLoaded", function() {
-      // 1. DYNAMIC CAMERA CONFIGURATION
-      // Check if URL has a specific camera mode requested (for our flip fallback)
-      const urlParams = new URLSearchParams(window.location.search);
-      const currentFacingMode = urlParams.get('facingMode') || 'environment';
+    const quizData = [
+      { q: "What is the main mosque in UTM Johor Bahru called?", options: ["Sultan Ismail Mosque", "Sultan Iskandar Mosque", "UTM Grand Mosque", "Johor Royal Mosque"], ans: 0 },
+      { q: "Which block is the Faculty of Computing (FC) primarily located at?", options: ["N24", "N28", "V01", "P19"], ans: 1 },
+      { q: "What was the former name of the Faculty of Computing?", options: ["FSKSM", "FKE", "FKA", "FKM"], ans: 0 }
+    ];
+
+    // Local Storage State Management
+    let appState = JSON.parse(localStorage.getItem('utmExplorerState')) || {
+      masjid: { checkedIn: false, photo: null },
+      fc: { checkedIn: false, photo: null }
+    };
+    
+    let currentQuizIndex = 0;
+    let currentScore = 0;
+    let arViewMode = 'info'; // 'info' or '3d'
+    let activeArPlace = null;
+
+    function saveState() {
+      localStorage.setItem('utmExplorerState', JSON.stringify(appState));
+    }
+
+    function checkAllCompleted() {
+      return appState.masjid.checkedIn && appState.fc.checkedIn;
+    }
+  </script>
+
+  <!-- ========================================== -->
+  <!-- SCREEN 1: HOME DASHBOARD                   -->
+  <!-- ========================================== -->
+  <div id="screen-home" class="ui-layer bg-gradient-to-br from-slate-900 to-indigo-950 p-6 hidden">
+    <div class="max-w-md mx-auto mt-8 fade-in">
+      <div class="flex justify-between items-center mb-8">
+        <h1 class="text-3xl font-bold text-white"><i class="fa-solid fa-map-location-dot text-indigo-400 mr-2"></i> UTM Explorer</h1>
+        <button onclick="navigate('gallery')" class="glass px-4 py-2 rounded-full text-sm font-semibold hover:bg-white/20 transition">
+          <i class="fa-solid fa-images"></i> Gallery
+        </button>
+      </div>
       
-      const sceneEl = document.querySelector('a-scene');
-      // Apply the camera mode before the AR system starts
-      sceneEl.setAttribute('mindar-image', `imageTargetSrc: masjid.mind; autoStart: false; filterMinCF:0.0001; filterBeta: 0.001; facingMode: ${currentFacingMode};`);
+      <p class="text-slate-300 mb-6 text-sm">Explore the campus, scan the markers, and check-in to unlock the ultimate UTM quiz!</p>
 
-      const startBtn = document.getElementById("start-btn");
-      const startScreen = document.getElementById("start-screen");
-      const flipBtn = document.getElementById("flip-btn");
-      const captureBtn = document.getElementById("capture-btn");
-      const galleryBtn = document.getElementById("gallery-btn");
-      const galleryModal = document.getElementById("gallery-modal");
-      const closeGalleryBtn = document.getElementById("close-gallery");
-      const galleryImage = document.getElementById("gallery-image");
+      <!-- Location Cards -->
+      <div class="space-y-4" id="home-cards-container">
+        <!-- Injected via JS -->
+      </div>
 
-      startBtn.addEventListener("click", function() {
-        startScreen.style.display = "none";
-        const arSystem = sceneEl.systems["mindar-image-system"];
-        if(arSystem) {
-            arSystem.start().catch((err) => {
-                console.error("MindAR failed to start.", err);
-                alert("Failed to start AR. Please ensure camera access is allowed.");
-            });
+      <!-- Quiz Unlock Section -->
+      <div id="quiz-unlock-section" class="mt-8 p-6 glass rounded-2xl text-center hidden border-green-400/30">
+        <div class="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+          <i class="fa-solid fa-unlock-keyhole text-2xl text-green-400"></i>
+        </div>
+        <h3 class="font-bold text-xl mb-2 text-green-400">Quiz Unlocked!</h3>
+        <p class="text-sm text-slate-300 mb-4">You have successfully explored all locations.</p>
+        <button onclick="navigate('quiz')" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-green-500/30">
+          Start Quiz Now
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function renderHome() {
+      const container = document.getElementById('home-cards-container');
+      container.innerHTML = '';
+      
+      Object.keys(placesData).forEach(key => {
+        const place = placesData[key];
+        const status = appState[key].checkedIn;
+        
+        container.innerHTML += `
+          <div onclick="navigate('ar', '${key}')" class="glass rounded-2xl overflow-hidden cursor-pointer transform hover:scale-[1.02] transition shadow-lg relative">
+            <div class="h-40 w-full overflow-hidden relative">
+              <img src="${place.img}" alt="${place.title}" onerror="this.src='https://placehold.co/600x400/1e293b/ffffff?text=${place.title}'" class="w-full h-full object-cover transition duration-500 ${status ? '' : 'grayscale'}">
+              <div class="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent"></div>
+            </div>
+            <div class="p-4 relative">
+              ${status 
+                ? `<span class="absolute -top-5 right-4 bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg"><i class="fa-solid fa-check mr-1"></i> Checked In</span>` 
+                : `<span class="absolute -top-5 right-4 bg-slate-700 text-slate-300 text-xs font-bold px-3 py-1 rounded-full shadow-lg">Pending</span>`
+              }
+              <h2 class="text-xl font-bold mb-1">${place.title}</h2>
+              <p class="text-indigo-300 text-sm font-medium"><i class="fa-solid fa-camera mr-1"></i> Tap to scan & explore</p>
+            </div>
+          </div>
+        `;
+      });
+
+      if (checkAllCompleted()) {
+        document.getElementById('quiz-unlock-section').classList.remove('hidden');
+      }
+    }
+  </script>
+
+  <!-- ========================================== -->
+  <!-- SCREEN 2: GALLERY                          -->
+  <!-- ========================================== -->
+  <div id="screen-gallery" class="ui-layer bg-slate-900 p-6 hidden">
+    <div class="max-w-md mx-auto mt-8 fade-in">
+      <button onclick="navigate('home')" class="mb-6 text-indigo-400 font-semibold"><i class="fa-solid fa-arrow-left mr-2"></i> Back Home</button>
+      <h2 class="text-3xl font-bold mb-6">Your Memories</h2>
+      
+      <div id="gallery-container" class="space-y-6">
+        <!-- Injected via JS -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function renderGallery() {
+      const container = document.getElementById('gallery-container');
+      container.innerHTML = '';
+      
+      let hasPhotos = false;
+      Object.keys(placesData).forEach(key => {
+        if (appState[key].checkedIn && appState[key].photo) {
+          hasPhotos = true;
+          const place = placesData[key];
+          container.innerHTML += `
+            <div class="glass p-3 rounded-2xl">
+              <img src="${appState[key].photo}" class="w-full rounded-xl border border-white/10 mb-3">
+              <h3 class="font-bold text-lg px-2"><i class="fa-solid fa-location-dot text-indigo-400 mr-2"></i> ${place.title}</h3>
+            </div>
+          `;
         }
       });
 
-      flipBtn.addEventListener("click", function() {
-        const arSystem = sceneEl.systems["mindar-image-system"];
+      if (!hasPhotos) {
+        container.innerHTML = `
+          <div class="text-center text-slate-400 py-12">
+            <i class="fa-solid fa-camera-retro text-4xl mb-3 opacity-50"></i>
+            <p>No photos yet. Check in to places to build your gallery!</p>
+          </div>
+        `;
+      }
+    }
+  </script>
+
+
+  <!-- ========================================== -->
+  <!-- SCREEN 3: AR OVERLAY UI                    -->
+  <!-- ========================================== -->
+  <div id="screen-ar" class="ui-layer hidden pointer-events-none">
+    
+    <!-- Top Bar -->
+    <div class="p-4 flex justify-between items-start pointer-events-auto w-full max-w-md mx-auto">
+      <button onclick="navigate('home')" class="glass-dark w-12 h-12 rounded-full flex items-center justify-center text-white active:scale-95 transition no-ar-touch shadow-lg">
+        <i class="fa-solid fa-times text-xl"></i>
+      </button>
+    </div>
+
+    <!-- Main AR Content Overlay -->
+    <div class="absolute bottom-0 left-0 w-full p-4 pb-8 pointer-events-auto no-ar-touch">
+      <div class="max-w-md mx-auto relative">
         
-        function forceReloadFlip() {
-            // Brute-force fallback: Reload the page requesting the opposite camera
-            const url = new URL(window.location.href);
-            const nextMode = currentFacingMode === "environment" ? "user" : "environment";
-            url.searchParams.set("facingMode", nextMode);
-            window.location.href = url.href;
-        }
+        <!-- Toggle Button -->
+        <div class="flex justify-center mb-4">
+          <div class="glass-dark p-1 rounded-full flex">
+            <button id="toggle-info-btn" onclick="setArMode('info')" class="px-6 py-2 rounded-full text-sm font-bold bg-indigo-500 text-white transition shadow-md">Information</button>
+            <button id="toggle-3d-btn" onclick="setArMode('3d')" class="px-6 py-2 rounded-full text-sm font-bold text-slate-300 transition">3D Model</button>
+          </div>
+        </div>
 
-        if(arSystem && typeof arSystem.switchCamera === 'function') {
-          try {
-            arSystem.switchCamera(); // Try smooth transition first
-          } catch(e) {
-            forceReloadFlip();
-          }
-        } else {
-           forceReloadFlip();
-        }
-      });
+        <!-- Info Card -->
+        <div id="ar-info-card" class="glass-dark rounded-2xl p-5 mb-4 fade-in">
+          <h2 id="ar-title" class="text-2xl font-bold mb-2 text-white">Loading...</h2>
+          <p id="ar-desc" class="text-slate-300 text-sm leading-relaxed mb-4">Scan the corresponding marker to view information.</p>
+          <div class="bg-indigo-900/50 border border-indigo-400/30 rounded-lg p-3 text-xs text-indigo-200 flex items-center">
+            <i class="fa-solid fa-circle-info text-indigo-400 mr-2 text-lg"></i> Point your camera at the real-world image marker.
+          </div>
+        </div>
 
-      captureBtn.addEventListener("click", function() {
-        const video = document.querySelector('video');
-        const glCanvas = sceneEl.canvas;
+        <!-- 3D Hint Card -->
+        <div id="ar-3d-hint" class="glass-dark rounded-2xl p-4 mb-4 text-center hidden fade-in border-indigo-500/50">
+          <p class="text-sm font-medium text-indigo-200"><i class="fa-solid fa-hand-pointer mr-2"></i> Drag to rotate • Pinch to scale</p>
+        </div>
+
+        <!-- Check-in Action -->
+        <button onclick="checkInTarget()" class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold py-4 rounded-xl transition shadow-xl flex justify-center items-center active:scale-95">
+          <i class="fa-solid fa-camera mr-2 text-xl"></i> Take Photo & Check In
+        </button>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function setArMode(mode) {
+      arViewMode = mode;
+      const infoBtn = document.getElementById('toggle-info-btn');
+      const tdBtn = document.getElementById('toggle-3d-btn');
+      const infoCard = document.getElementById('ar-info-card');
+      const tdHint = document.getElementById('ar-3d-hint');
+      
+      // Select the 3D Wrapper in A-Frame
+      const wrapper3D = document.getElementById('ar-models-wrapper');
+
+      if (mode === 'info') {
+        infoBtn.classList.add('bg-indigo-500', 'text-white', 'shadow-md');
+        infoBtn.classList.remove('text-slate-300');
+        tdBtn.classList.remove('bg-indigo-500', 'text-white', 'shadow-md');
+        tdBtn.classList.add('text-slate-300');
         
-        if (!video || !glCanvas) {
-          alert("Camera feed not ready yet!");
-          return;
-        }
+        infoCard.classList.remove('hidden');
+        tdHint.classList.add('hidden');
+        
+        if(wrapper3D) wrapper3D.setAttribute('visible', 'false');
+      } else {
+        tdBtn.classList.add('bg-indigo-500', 'text-white', 'shadow-md');
+        tdBtn.classList.remove('text-slate-300');
+        infoBtn.classList.remove('bg-indigo-500', 'text-white', 'shadow-md');
+        infoBtn.classList.add('text-slate-300');
+        
+        infoCard.classList.add('hidden');
+        tdHint.classList.remove('hidden');
 
-        // INSTANTLY capture canvas before browser clears WebGL buffer
+        if(wrapper3D) wrapper3D.setAttribute('visible', 'true');
+      }
+    }
+
+    function checkInTarget() {
+      if(!activeArPlace) return;
+
+      const video = document.querySelector('video');
+      const glCanvas = document.querySelector('a-scene').canvas;
+      
+      if (!video || !glCanvas) {
+        alert("Camera feed not ready yet!");
+        return;
+      }
+
+      // Hide AR UI temporarily for clean screenshot
+      document.getElementById('screen-ar').style.display = 'none';
+      
+      // Flash effect
+      const flash = document.createElement('div');
+      flash.className = 'fixed inset-0 bg-white z-[99999] transition-opacity duration-300';
+      document.body.appendChild(flash);
+
+      setTimeout(() => {
+        flash.style.opacity = '0';
+        setTimeout(() => flash.remove(), 300);
+
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = glCanvas.width;
         tempCanvas.height = glCanvas.height;
         const ctx = tempCanvas.getContext('2d');
 
-        // Precise video scaling math
-        const vw = video.videoWidth;
-        const vh = video.videoHeight;
-        const cw = glCanvas.width;
-        const ch = glCanvas.height;
-        const vRatio = vw / vh;
-        const cRatio = cw / ch;
+        const vw = video.videoWidth; const vh = video.videoHeight;
+        const cw = glCanvas.width; const ch = glCanvas.height;
+        const vRatio = vw / vh; const cRatio = cw / ch;
         
         let drawWidth, drawHeight, startX, startY;
         if (vRatio > cRatio) {
-           drawHeight = ch;
-           drawWidth = vw * (ch / vh);
-           startX = (cw - drawWidth) / 2;
-           startY = 0;
+           drawHeight = ch; drawWidth = vw * (ch / vh);
+           startX = (cw - drawWidth) / 2; startY = 0;
         } else {
-           drawWidth = cw;
-           drawHeight = vh * (cw / vw);
-           startX = 0;
-           startY = (ch - drawHeight) / 2;
+           drawWidth = cw; drawHeight = vh * (cw / vw);
+           startX = 0; startY = (ch - drawHeight) / 2;
         }
 
-        // Merge Camera + 3D Model
         ctx.drawImage(video, startX, startY, drawWidth, drawHeight);
         ctx.drawImage(glCanvas, 0, 0, cw, ch);
-        const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.9);
 
-        // Visual flash effect
-        const flash = document.createElement('div');
-        flash.style.position = 'absolute';
-        flash.style.top = '0'; flash.style.left = '0';
-        flash.style.width = '100%'; flash.style.height = '100%';
-        flash.style.backgroundColor = 'white';
-        flash.style.zIndex = '999999';
-        flash.style.transition = 'opacity 0.5s';
-        document.body.appendChild(flash);
-        setTimeout(() => { flash.style.opacity = '0'; setTimeout(() => flash.remove(), 500); }, 50);
+        const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.8); // 0.8 compression to fit in localStorage comfortably
 
-        // Timestamp Filename
-        const now = new Date();
-        const timestamp = now.getFullYear().toString() + 
-                         (now.getMonth()+1).toString().padStart(2,'0') + 
-                         now.getDate().toString().padStart(2,'0') + '_' + 
-                         now.getHours().toString().padStart(2,'0') + 
-                         now.getMinutes().toString().padStart(2,'0') + 
-                         now.getSeconds().toString().padStart(2,'0');
-        const fileName = 'Masjid_' + timestamp + '.jpg';
+        // Update State
+        appState[activeArPlace].checkedIn = true;
+        appState[activeArPlace].photo = dataUrl;
+        saveState();
 
-        // Trigger Download
-        const link = document.createElement('a');
-        link.download = fileName;
-        link.href = dataUrl;
-        link.click();
-
-        // Save to LocalStorage
-        try { localStorage.setItem('savedMasjidSnapshot', dataUrl); } 
-        catch (e) { console.warn("Could not save to LocalStorage", e); }
-      });
-
-      galleryBtn.addEventListener("click", function() {
-        const savedImage = localStorage.getItem('savedMasjidSnapshot');
-        if (savedImage) {
-          galleryImage.src = savedImage;
-          galleryModal.style.display = "flex";
-        } else alert("You haven't taken any photos yet!");
-      });
-
-      closeGalleryBtn.addEventListener("click", function() {
-        galleryModal.style.display = "none";
-      });
-    });
+        alert(`Successfully Checked In at ${placesData[activeArPlace].title}!`);
+        
+        // Hard navigation back home to gracefully kill AR camera
+        window.location.href = window.location.pathname; 
+      }, 50);
+    }
   </script>
-</head>
-<body>
 
-  <div id="start-screen">
-    <h1>Masjid AR</h1>
-    <p>Allow camera access and scan the image to view the 3D model.</p>
-    <button id="start-btn">Start Experience</button>
-  </div>
+  <!-- ========================================== -->
+  <!-- SCREEN 4: QUIZ                             -->
+  <!-- ========================================== -->
+  <div id="screen-quiz" class="ui-layer bg-slate-900 p-6 hidden">
+    <div class="max-w-md mx-auto mt-8 fade-in h-full flex flex-col">
+      <div class="flex justify-between items-center mb-6">
+        <button onclick="navigate('home')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-times text-xl"></i></button>
+        <span class="bg-indigo-900 text-indigo-300 text-xs font-bold px-3 py-1 rounded-full">UTM Explorer Quiz</span>
+      </div>
 
-  <div id="gallery-modal">
-    <h2 style="color:white; margin-bottom: 20px;">Your Saved Snapshot</h2>
-    <img id="gallery-image" src="" alt="Saved AR Snapshot">
-    <button class="close-btn" id="close-gallery">Close Gallery</button>
-  </div>
+      <!-- Quiz Content -->
+      <div id="quiz-question-container" class="flex-grow flex flex-col justify-center pb-20">
+        <div class="mb-4 text-indigo-400 font-bold text-sm tracking-widest uppercase">Question <span id="q-num">1</span> of 3</div>
+        <h2 id="q-text" class="text-2xl font-bold mb-8 leading-tight">Question text goes here?</h2>
+        
+        <div id="q-options" class="space-y-3">
+          <!-- Injected via JS -->
+        </div>
+      </div>
 
-  <div id="ui-container">
-    <div class="instruction-badge">Scan image. Drag to rotate, pinch to scale.</div>
-    <div id="controls-container">
-      <button class="control-btn" id="flip-btn" title="Flip Camera">🔄</button>
-      <button class="control-btn capture-btn" id="capture-btn" title="Take Photo">📸</button>
-      <button class="control-btn" id="gallery-btn" title="View Gallery">🖼️</button>
+      <!-- Score Screen -->
+      <div id="quiz-score-container" class="hidden flex-grow flex flex-col items-center justify-center pb-20 fade-in text-center">
+        <div class="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-indigo-500/40">
+          <i class="fa-solid fa-trophy text-4xl text-white"></i>
+        </div>
+        <h2 class="text-3xl font-bold mb-2">Quiz Complete!</h2>
+        <p class="text-slate-300 mb-8">You scored <span id="score-display" class="font-bold text-indigo-400 text-xl">0/3</span></p>
+        
+        <button onclick="navigate('home')" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-4 rounded-xl transition shadow-lg">
+          Return to Dashboard
+        </button>
+      </div>
+
     </div>
   </div>
 
-  <a-scene 
-    mindar-image="imageTargetSrc: masjid.mind; autoStart: false; filterMinCF:0.0001; filterBeta: 0.001;" 
-    color-space="sRGB" 
-    renderer="colorManagement: true; physicallyCorrectLights: true; preserveDrawingBuffer: true;" 
-    vr-mode-ui="enabled: false" 
-    device-orientation-permission-ui="enabled: false">
-    
-    <a-assets>
-      <img id="tex-tile" src="data:image/svg+xml;utf8,<svg width='64' height='64' xmlns='http://www.w3.org/2000/svg'><rect width='64' height='64' fill='%23f1f5f9'/><path d='M32 0 L64 32 L32 64 L0 32 Z' fill='%23cbd5e1'/><circle cx='32' cy='32' r='16' fill='%2394a3b8'/></svg>">
-      <img id="tex-stone" src="data:image/svg+xml;utf8,<svg width='128' height='128' xmlns='http://www.w3.org/2000/svg'><rect width='128' height='128' fill='%23eaddcf'/><path d='M0 32 h128 M0 64 h128 M0 96 h128 M32 0 v32 M96 0 v32 M64 32 v32 M16 64 v32 M80 64 v32 M48 96 v32 M112 96 v32' stroke='%23c1ae98' stroke-width='2'/></svg>">
-      <img id="tex-dome" src="data:image/svg+xml;utf8,<svg width='64' height='64' xmlns='http://www.w3.org/2000/svg'><rect width='64' height='64' fill='%23059669'/><path d='M32 0 L64 32 L32 64 L0 32 Z' stroke='%23047857' stroke-width='2' fill='none'/><path d='M0 0 L32 32 L0 64 M64 0 L32 32 L64 64' stroke='%23047857' stroke-width='2' fill='none'/></svg>">
-      <img id="tex-window" src="data:image/svg+xml;utf8,<svg width='32' height='64' xmlns='http://www.w3.org/2000/svg'><rect width='32' height='64' fill='%23eaddcf'/><path d='M4 32 A 12 12 0 0 1 28 32 L 28 60 L 4 60 Z' fill='%231e293b'/><path d='M16 20 L 16 60 M 4 40 L 28 40 M 4 50 L 28 50' stroke='%23334155' stroke-width='2'/></svg>">
-      <img id="tex-marble" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' fill='%23f8fafc'/><path d='M0 63 L64 63 M63 0 L63 64' stroke='%23e2e8f0' stroke-width='2'/></svg>">
-    </a-assets>
+  <script>
+    function renderQuiz() {
+      document.getElementById('quiz-score-container').classList.add('hidden');
+      document.getElementById('quiz-question-container').classList.remove('hidden');
+      
+      const q = quizData[currentQuizIndex];
+      document.getElementById('q-num').innerText = currentQuizIndex + 1;
+      document.getElementById('q-text').innerText = q.q;
+      
+      const optionsContainer = document.getElementById('q-options');
+      optionsContainer.innerHTML = '';
+      
+      const labels = ['A', 'B', 'C', 'D'];
+      q.options.forEach((opt, idx) => {
+        optionsContainer.innerHTML += `
+          <button onclick="answerQuiz(${idx})" class="w-full text-left glass-dark hover:bg-white/10 p-4 rounded-xl transition flex items-center group">
+            <span class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center font-bold mr-4 group-hover:bg-indigo-500 group-hover:text-white transition">${labels[idx]}</span>
+            <span class="font-medium">${opt}</span>
+          </button>
+        `;
+      });
+    }
 
-    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+    function answerQuiz(selectedIndex) {
+      if (selectedIndex === quizData[currentQuizIndex].ans) {
+        currentScore++;
+      }
+      currentQuizIndex++;
+      
+      if (currentQuizIndex < quizData.length) {
+        renderQuiz();
+      } else {
+        // Show Score
+        document.getElementById('quiz-question-container').classList.add('hidden');
+        document.getElementById('quiz-score-container').classList.remove('hidden');
+        document.getElementById('score-display').innerText = `${currentScore}/${quizData.length}`;
+        currentQuizIndex = 0; // Reset for next time
+        currentScore = 0;
+      }
+    }
+  </script>
 
-    <a-entity mindar-image-target="targetIndex: 0">
-      <a-entity drag-rotate-scale position="0 -0.5 0" scale="0.4 0.4 0.4">
+  <!-- ========================================== -->
+  <!-- SCREEN 5: AR ENGINE INJECTION              -->
+  <!-- ========================================== -->
+  <div id="ar-container" class="hidden">
+    <!-- Injected dynamically to avoid WebGL lockups when not needed -->
+  </div>
+
+  <!-- ROUTING LOGIC -->
+  <script>
+    function navigate(page, payload = null) {
+      // Clear URL params to ensure clean state on reloads, except for AR
+      const url = new URL(window.location);
+      url.search = ''; 
+      
+      if (page === 'ar') {
+        url.searchParams.set('target', payload);
+        window.location.href = url.toString();
+        return;
+      } else if (page !== 'home') {
+        url.searchParams.set('page', page);
+      }
+      
+      window.history.pushState({}, '', url.toString());
+      handleRoute();
+    }
+
+    function handleRoute() {
+      // Hide all screens
+      document.querySelectorAll('.ui-layer').forEach(el => el.classList.add('hidden'));
+      document.getElementById('ar-container').classList.add('hidden');
+      document.getElementById('ar-container').innerHTML = ''; // Kill AR scene
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const target = urlParams.get('target');
+      const page = urlParams.get('page');
+
+      if (target && placesData[target]) {
+        // BOOT AR MODE
+        activeArPlace = target;
+        document.getElementById('screen-ar').classList.remove('hidden');
+        document.getElementById('ar-container').classList.remove('hidden');
         
-        <!-- Base -->
-        <a-box position="0 0 0" width="3.0" height="0.05" depth="3.0" src="#tex-tile" repeat="8 8" shadow></a-box>
-        <a-box position="0 0.15 1.45" width="3.0" height="0.3" depth="0.1" src="#tex-stone" repeat="6 1"></a-box>
-        <a-box position="0 0.15 -1.45" width="3.0" height="0.3" depth="0.1" src="#tex-stone" repeat="6 1"></a-box>
-        <a-box position="1.45 0.15 0" width="0.1" height="0.3" depth="2.8" src="#tex-stone" repeat="6 1"></a-box>
-        <a-box position="-1.45 0.15 0" width="0.1" height="0.3" depth="2.8" src="#tex-stone" repeat="6 1"></a-box>
+        // Setup Info UI
+        document.getElementById('ar-title').innerText = placesData[target].title;
+        document.getElementById('ar-desc').innerText = placesData[target].desc;
+        setArMode('info'); // Default to info mode
 
-        <!-- Building -->
-        <a-box position="0 0.45 0" width="1.6" height="0.8" depth="1.6" src="#tex-stone" repeat="4 2"></a-box>
-        <a-cylinder position="0 1.0 0" radius="0.9" height="0.3" segments-radial="8" src="#tex-stone" repeat="3 1"></a-cylinder>
+        // Inject A-Frame HTML safely
+        document.getElementById('ar-container').innerHTML = `
+          <a-scene 
+            mindar-image="imageTargetSrc: ${placesData[target].mindFile}; autoStart: true; filterMinCF:0.0001; filterBeta: 0.001;" 
+            color-space="sRGB" 
+            renderer="colorManagement: true; physicallyCorrectLights: true; preserveDrawingBuffer: true;" 
+            vr-mode-ui="enabled: false" 
+            device-orientation-permission-ui="enabled: false">
+            
+            <a-assets>
+              <img id="tex-tile" src="data:image/svg+xml;utf8,<svg width='64' height='64' xmlns='http://www.w3.org/2000/svg'><rect width='64' height='64' fill='%23f1f5f9'/><path d='M32 0 L64 32 L32 64 L0 32 Z' fill='%23cbd5e1'/><circle cx='32' cy='32' r='16' fill='%2394a3b8'/></svg>">
+              <img id="tex-stone" src="data:image/svg+xml;utf8,<svg width='128' height='128' xmlns='http://www.w3.org/2000/svg'><rect width='128' height='128' fill='%23eaddcf'/><path d='M0 32 h128 M0 64 h128 M0 96 h128 M32 0 v32 M96 0 v32 M64 32 v32 M16 64 v32 M80 64 v32 M48 96 v32 M112 96 v32' stroke='%23c1ae98' stroke-width='2'/></svg>">
+              <img id="tex-dome" src="data:image/svg+xml;utf8,<svg width='64' height='64' xmlns='http://www.w3.org/2000/svg'><rect width='64' height='64' fill='%23059669'/><path d='M32 0 L64 32 L32 64 L0 32 Z' stroke='%23047857' stroke-width='2' fill='none'/><path d='M0 0 L32 32 L0 64 M64 0 L32 32 L64 64' stroke='%23047857' stroke-width='2' fill='none'/></svg>">
+              <img id="tex-window" src="data:image/svg+xml;utf8,<svg width='32' height='64' xmlns='http://www.w3.org/2000/svg'><rect width='32' height='64' fill='%23eaddcf'/><path d='M4 32 A 12 12 0 0 1 28 32 L 28 60 L 4 60 Z' fill='%231e293b'/><path d='M16 20 L 16 60 M 4 40 L 28 40 M 4 50 L 28 50' stroke='%23334155' stroke-width='2'/></svg>">
+              <img id="tex-marble" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' fill='%23f8fafc'/><path d='M0 63 L64 63 M63 0 L63 64' stroke='%23e2e8f0' stroke-width='2'/></svg>">
+              <img id="tex-fc-grey" src="data:image/svg+xml;utf8,<svg width='64' height='64' xmlns='http://www.w3.org/2000/svg'><rect width='64' height='64' fill='%2394a3b8'/><path d='M0 32 L64 32' stroke='%2364748b' stroke-width='1'/></svg>">
+              <img id="tex-fc-window" src="data:image/svg+xml;utf8,<svg width='64' height='64' xmlns='http://www.w3.org/2000/svg'><rect width='64' height='64' fill='%2394a3b8'/><rect x='4' y='16' width='56' height='32' fill='%231e3a8a'/><line x1='32' y1='16' x2='32' y2='48' stroke='%2394a3b8' stroke-width='2'/></svg>">
+            </a-assets>
 
-        <a-plane position="0.81 0.45 0.4" width="0.2" height="0.4" rotation="0 90 0" src="#tex-window"></a-plane>
-        <a-plane position="0.81 0.45 -0.4" width="0.2" height="0.4" rotation="0 90 0" src="#tex-window"></a-plane>
-        <a-plane position="-0.81 0.45 0.4" width="0.2" height="0.4" rotation="0 -90 0" src="#tex-window"></a-plane>
-        <a-plane position="-0.81 0.45 -0.4" width="0.2" height="0.4" rotation="0 -90 0" src="#tex-window"></a-plane>
-        <a-plane position="0.4 0.45 -0.81" width="0.2" height="0.4" rotation="0 180 0" src="#tex-window"></a-plane>
-        <a-plane position="-0.4 0.45 -0.81" width="0.2" height="0.4" rotation="0 180 0" src="#tex-window"></a-plane>
+            <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-        <!-- Dome -->
-        <a-cylinder position="0 1.25 0" radius="0.6" height="0.25" src="#tex-stone" repeat="4 1"></a-cylinder>
-        <a-sphere position="0 1.35 0" radius="0.6" src="#tex-dome" repeat="8 4" theta-length="180" material="roughness: 0.3; metalness: 0.2"></a-sphere>
-        <a-cylinder position="0 2.1 0" radius="0.02" height="0.3" color="#fbbf24" material="metalness: 0.8"></a-cylinder>
-        <a-torus position="0 2.3 0" radius="0.08" radius-tubular="0.015" arc="180" color="#fbbf24" rotation="0 90 90" material="metalness: 0.8"></a-torus>
+            <a-entity mindar-image-target="targetIndex: 0">
+              <!-- WRAPPER FOR DRAG CONTROLS -->
+              <a-entity id="ar-models-wrapper" drag-rotate-scale position="0 -0.3 0" scale="0.4 0.4 0.4" visible="false">
+                
+                <a-entity id="model-masjid" visible="${target === 'masjid' ? 'true' : 'false'}">
+                  <!-- Courtyard Base -->
+                  <a-box position="0 0 0" width="3.0" height="0.05" depth="3.0" src="#tex-tile" repeat="8 8"></a-box>
+                  <a-box position="0 0.15 1.45" width="3.0" height="0.3" depth="0.1" src="#tex-stone" repeat="6 1"></a-box>
+                  <a-box position="0 0.15 -1.45" width="3.0" height="0.3" depth="0.1" src="#tex-stone" repeat="6 1"></a-box>
+                  <a-box position="1.45 0.15 0" width="0.1" height="0.3" depth="2.8" src="#tex-stone" repeat="6 1"></a-box>
+                  <a-box position="-1.45 0.15 0" width="0.1" height="0.3" depth="2.8" src="#tex-stone" repeat="6 1"></a-box>
+                  <!-- Main Building -->
+                  <a-box position="0 0.45 0" width="1.6" height="0.8" depth="1.6" src="#tex-stone" repeat="4 2"></a-box>
+                  <a-cylinder position="0 1.0 0" radius="0.9" height="0.3" segments-radial="8" src="#tex-stone" repeat="3 1"></a-cylinder>
+                  <a-plane position="0.81 0.45 0.4" width="0.2" height="0.4" rotation="0 90 0" src="#tex-window"></a-plane>
+                  <a-plane position="0.81 0.45 -0.4" width="0.2" height="0.4" rotation="0 90 0" src="#tex-window"></a-plane>
+                  <a-plane position="-0.81 0.45 0.4" width="0.2" height="0.4" rotation="0 -90 0" src="#tex-window"></a-plane>
+                  <a-plane position="-0.81 0.45 -0.4" width="0.2" height="0.4" rotation="0 -90 0" src="#tex-window"></a-plane>
+                  <a-plane position="0.4 0.45 -0.81" width="0.2" height="0.4" rotation="0 180 0" src="#tex-window"></a-plane>
+                  <a-plane position="-0.4 0.45 -0.81" width="0.2" height="0.4" rotation="0 180 0" src="#tex-window"></a-plane>
+                  <!-- Dome -->
+                  <a-cylinder position="0 1.25 0" radius="0.6" height="0.25" src="#tex-stone" repeat="4 1"></a-cylinder>
+                  <a-sphere position="0 1.35 0" radius="0.6" src="#tex-dome" repeat="8 4" theta-length="180" material="roughness: 0.3; metalness: 0.2"></a-sphere>
+                  <a-cylinder position="0 2.1 0" radius="0.02" height="0.3" color="#fbbf24" material="metalness: 0.8"></a-cylinder>
+                  <a-torus position="0 2.3 0" radius="0.08" radius-tubular="0.015" arc="180" color="#fbbf24" rotation="0 90 90" material="metalness: 0.8"></a-torus>
+                  <!-- Entrance -->
+                  <a-entity position="0 0.02 0.8">
+                    <a-box position="0 0.4 0.05" width="0.7" height="0.8" depth="0.1" src="#tex-stone"></a-box>
+                    <a-box position="0 0.35 0.11" width="0.4" height="0.7" depth="0.05" color="#0f172a"></a-box>
+                    <a-cylinder position="0 0.7 0.11" radius="0.2" height="0.05" rotation="90 0 0" color="#0f172a" theta-length="180"></a-cylinder>
+                  </a-entity>
+                  <!-- 4 Minarets (Simplified for code brevity) -->
+                  <a-entity position="-1.2 0 1.2"><a-box position="0 0.4 0" width="0.3" height="0.8" depth="0.3" src="#tex-stone"></a-box><a-cylinder position="0 1.2 0" radius="0.12" height="0.8" src="#tex-marble"></a-cylinder><a-sphere position="0 1.6 0" radius="0.12" src="#tex-dome" theta-length="180"></a-sphere></a-entity>
+                  <a-entity position="1.2 0 1.2"><a-box position="0 0.4 0" width="0.3" height="0.8" depth="0.3" src="#tex-stone"></a-box><a-cylinder position="0 1.2 0" radius="0.12" height="0.8" src="#tex-marble"></a-cylinder><a-sphere position="0 1.6 0" radius="0.12" src="#tex-dome" theta-length="180"></a-sphere></a-entity>
+                  <a-entity position="-1.2 0 -1.2"><a-box position="0 0.4 0" width="0.3" height="0.8" depth="0.3" src="#tex-stone"></a-box><a-cylinder position="0 1.2 0" radius="0.12" height="0.8" src="#tex-marble"></a-cylinder><a-sphere position="0 1.6 0" radius="0.12" src="#tex-dome" theta-length="180"></a-sphere></a-entity>
+                  <a-entity position="1.2 0 -1.2"><a-box position="0 0.4 0" width="0.3" height="0.8" depth="0.3" src="#tex-stone"></a-box><a-cylinder position="0 1.2 0" radius="0.12" height="0.8" src="#tex-marble"></a-cylinder><a-sphere position="0 1.6 0" radius="0.12" src="#tex-dome" theta-length="180"></a-sphere></a-entity>
+                </a-entity>
 
-        <!-- 4 Corner Domes -->
-        <a-entity position="-0.7 0.9 0.7"><a-cylinder position="0 0 0" radius="0.15" height="0.1" src="#tex-stone"></a-cylinder><a-sphere position="0 0.05 0" radius="0.15" src="#tex-dome" theta-length="180"></a-sphere><a-cylinder position="0 0.3 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder></a-entity>
-        <a-entity position="0.7 0.9 0.7"><a-cylinder position="0 0 0" radius="0.15" height="0.1" src="#tex-stone"></a-cylinder><a-sphere position="0 0.05 0" radius="0.15" src="#tex-dome" theta-length="180"></a-sphere><a-cylinder position="0 0.3 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder></a-entity>
-        <a-entity position="-0.7 0.9 -0.7"><a-cylinder position="0 0 0" radius="0.15" height="0.1" src="#tex-stone"></a-cylinder><a-sphere position="0 0.05 0" radius="0.15" src="#tex-dome" theta-length="180"></a-sphere><a-cylinder position="0 0.3 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder></a-entity>
-        <a-entity position="0.7 0.9 -0.7"><a-cylinder position="0 0 0" radius="0.15" height="0.1" src="#tex-stone"></a-cylinder><a-sphere position="0 0.05 0" radius="0.15" src="#tex-dome" theta-length="180"></a-sphere><a-cylinder position="0 0.3 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder></a-entity>
+                <a-entity id="model-fc" visible="${target === 'fc' ? 'true' : 'false'}" position="0 0.2 0">
+                  <!-- Ground -->
+                  <a-box position="0 -0.05 0" width="3" height="0.1" depth="2" color="#475569"></a-box>
+                  
+                  <!-- Main Center Block (N28) -->
+                  <a-box position="0 0.6 -0.3" width="1.2" height="1.2" depth="0.8" src="#tex-fc-window" repeat="2 3"></a-box>
+                  
+                  <!-- Top N28 Sign Structure -->
+                  <a-box position="0 1.3 -0.3" width="0.6" height="0.25" depth="0.4" src="#tex-fc-grey"></a-box>
+                  <a-text value="N28" position="0 1.3 -0.09" align="center" color="#1e293b" scale="0.8 0.8 0.8"></a-text>
 
-        <!-- Entrance -->
-        <a-entity position="0 0.02 0.8">
-          <a-box position="0 0.4 0.05" width="0.7" height="0.8" depth="0.1" src="#tex-stone"></a-box>
-          <a-box position="0 0.35 0.11" width="0.4" height="0.7" depth="0.05" color="#0f172a"></a-box>
-          <a-cylinder position="0 0.7 0.11" radius="0.2" height="0.05" rotation="90 0 0" color="#0f172a" theta-length="180"></a-cylinder>
-          <a-cylinder position="-0.25 0.4 0.12" radius="0.04" height="0.8" src="#tex-marble"></a-cylinder>
-          <a-cylinder position="0.25 0.4 0.12" radius="0.04" height="0.8" src="#tex-marble"></a-cylinder>
-        </a-entity>
+                  <!-- Left Wing -->
+                  <a-box position="-1.0 0.45 -0.2" width="0.8" height="0.9" depth="0.6" src="#tex-fc-window" repeat="1.5 2"></a-box>
+                  
+                  <!-- Right Wing -->
+                  <a-box position="1.0 0.45 -0.2" width="0.8" height="0.9" depth="0.6" src="#tex-fc-window" repeat="1.5 2"></a-box>
+                  
+                  <!-- Connecting Bridges -->
+                  <a-box position="-0.6 0.7 -0.1" width="0.4" height="0.3" depth="0.5" src="#tex-fc-grey"></a-box>
+                  <a-box position="0.6 0.7 -0.1" width="0.4" height="0.3" depth="0.5" src="#tex-fc-grey"></a-box>
 
-        <!-- 4 Minarets -->
-        <a-entity position="-1.2 0 1.2"><a-box position="0 0.4 0" width="0.3" height="0.8" depth="0.3" src="#tex-stone"></a-box><a-cylinder position="0 1.2 0" radius="0.12" height="0.8" src="#tex-marble"></a-cylinder><a-cylinder position="0 1.6 0" radius="0.18" height="0.05" src="#tex-stone"></a-cylinder><a-cylinder position="0 1.9 0" radius="0.1" height="0.6" src="#tex-marble"></a-cylinder><a-cylinder position="0 2.2 0" radius="0.15" height="0.05" src="#tex-stone"></a-cylinder><a-cylinder position="0 2.4 0" radius="0.08" height="0.4" src="#tex-marble"></a-cylinder><a-sphere position="0 2.6 0" radius="0.1" src="#tex-dome" theta-length="180"></a-sphere><a-cylinder position="0 2.75 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder></a-entity>
-        <a-entity position="1.2 0 1.2"><a-box position="0 0.4 0" width="0.3" height="0.8" depth="0.3" src="#tex-stone"></a-box><a-cylinder position="0 1.2 0" radius="0.12" height="0.8" src="#tex-marble"></a-cylinder><a-cylinder position="0 1.6 0" radius="0.18" height="0.05" src="#tex-stone"></a-cylinder><a-cylinder position="0 1.9 0" radius="0.1" height="0.6" src="#tex-marble"></a-cylinder><a-cylinder position="0 2.2 0" radius="0.15" height="0.05" src="#tex-stone"></a-cylinder><a-cylinder position="0 2.4 0" radius="0.08" height="0.4" src="#tex-marble"></a-cylinder><a-sphere position="0 2.6 0" radius="0.1" src="#tex-dome" theta-length="180"></a-sphere><a-cylinder position="0 2.75 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder></a-entity>
-        <a-entity position="-1.2 0 -1.2"><a-box position="0 0.4 0" width="0.3" height="0.8" depth="0.3" src="#tex-stone"></a-box><a-cylinder position="0 1.2 0" radius="0.12" height="0.8" src="#tex-marble"></a-cylinder><a-cylinder position="0 1.6 0" radius="0.18" height="0.05" src="#tex-stone"></a-cylinder><a-cylinder position="0 1.9 0" radius="0.1" height="0.6" src="#tex-marble"></a-cylinder><a-cylinder position="0 2.2 0" radius="0.15" height="0.05" src="#tex-stone"></a-cylinder><a-cylinder position="0 2.4 0" radius="0.08" height="0.4" src="#tex-marble"></a-cylinder><a-sphere position="0 2.6 0" radius="0.1" src="#tex-dome" theta-length="180"></a-sphere><a-cylinder position="0 2.75 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder></a-entity>
-        <a-entity position="1.2 0 -1.2"><a-box position="0 0.4 0" width="0.3" height="0.8" depth="0.3" src="#tex-stone"></a-box><a-cylinder position="0 1.2 0" radius="0.12" height="0.8" src="#tex-marble"></a-cylinder><a-cylinder position="0 1.6 0" radius="0.18" height="0.05" src="#tex-stone"></a-cylinder><a-cylinder position="0 1.9 0" radius="0.1" height="0.6" src="#tex-marble"></a-cylinder><a-cylinder position="0 2.2 0" radius="0.15" height="0.05" src="#tex-stone"></a-cylinder><a-cylinder position="0 2.4 0" radius="0.08" height="0.4" src="#tex-marble"></a-cylinder><a-sphere position="0 2.6 0" radius="0.1" src="#tex-dome" theta-length="180"></a-sphere><a-cylinder position="0 2.75 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder></a-entity>
+                  <!-- Iconic Red/Orange Entrance Roof -->
+                  <a-box position="0 0.45 0.4" width="1.4" height="0.08" depth="0.8" rotation="10 0 0" color="#ef4444"></a-box>
+                  <a-box position="0 0.52 0.35" width="1.4" height="0.03" depth="0.8" rotation="10 0 0" color="#b91c1c"></a-box>
+                  
+                  <!-- Orange Entrance Pillars -->
+                  <a-cylinder position="-0.5 0.2 0.6" radius="0.06" height="0.4" color="#f97316"></a-cylinder>
+                  <a-cylinder position="0.5 0.2 0.6" radius="0.06" height="0.4" color="#f97316"></a-cylinder>
+                  <a-cylinder position="-0.5 0.2 0.1" radius="0.06" height="0.4" color="#f97316"></a-cylinder>
+                  <a-cylinder position="0.5 0.2 0.1" radius="0.06" height="0.4" color="#f97316"></a-cylinder>
 
-      </a-entity>
-    </a-entity>
-  </a-scene>
+                  <!-- Entrance Stairs -->
+                  <a-box position="0 0.05 0.3" width="0.8" height="0.1" depth="0.6" color="#94a3b8"></a-box>
+                  <a-box position="0 0.15 0.2" width="0.8" height="0.1" depth="0.4" color="#64748b"></a-box>
+                  <a-box position="0 0.25 0.1" width="0.8" height="0.1" depth="0.2" color="#475569"></a-box>
+                </a-entity>
+
+              </a-entity>
+            </a-entity>
+          </a-scene>
+        `;
+
+      } else if (page === 'gallery') {
+        document.getElementById('screen-gallery').classList.remove('hidden');
+        renderGallery();
+      } else if (page === 'quiz') {
+        document.getElementById('screen-quiz').classList.remove('hidden');
+        currentQuizIndex = 0; currentScore = 0;
+        renderQuiz();
+      } else {
+        // HOME MODE
+        document.getElementById('screen-home').classList.remove('hidden');
+        renderHome();
+      }
+    }
+
+    // Initialize Router on load
+    window.addEventListener('popstate', handleRoute);
+    document.addEventListener("DOMContentLoaded", handleRoute);
+
+  </script>
 </body>
 </html>
