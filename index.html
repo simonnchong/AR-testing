@@ -92,7 +92,7 @@
     .fade-in { animation: fadeIn 0.4s ease-in-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     
-    /* A-Frame container fixes */
+    /* A-Frame container fixes for perfect fullscreen */
     #ar-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; overflow: hidden; background: #000; }
     #ar-container video, #ar-container canvas { width: 100vw !important; height: 100vh !important; object-fit: cover !important; position: absolute !important; top: 0 !important; left: 0 !important; margin: 0 !important; }
     .ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 50; overflow-y: auto; }
@@ -127,10 +127,11 @@
 
     // Local Storage State Management
     let appState = JSON.parse(localStorage.getItem('utmExplorerState')) || {
-      masjid: { checkedIn: false, photo: null },
-      fc: { checkedIn: false, photo: null },
+      masjid: { checkedIn: false, photo: null, checkInDate: null },
+      fc: { checkedIn: false, photo: null, checkInDate: null },
       quizHistory: []
     };
+    
     // Retrofit existing states to support history array
     if (!appState.quizHistory) appState.quizHistory = [];
     
@@ -235,12 +236,15 @@
         if (appState[key].checkedIn && appState[key].photo) {
           hasPhotos = true;
           const place = placesData[key];
+          const checkDate = appState[key].checkInDate || "Previous Check-in";
+          
           container.innerHTML += `
-            <div class="glass p-2 rounded-xl relative border border-white/10 group">
-              <span class="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-2 py-1 rounded-md text-[10px] leading-tight font-bold shadow-lg text-white max-w-[85%] truncate pointer-events-none">
-                <i class="fa-solid fa-location-dot text-indigo-400 mr-1"></i> ${place.title}
-              </span>
-              <img src="${appState[key].photo}" class="w-full h-48 object-cover rounded-lg shadow-md transition transform group-hover:scale-[1.02]">
+            <div class="glass p-2 rounded-xl relative border border-white/10 flex flex-col">
+              <img src="${appState[key].photo}" class="w-full h-36 object-cover rounded-lg shadow-md mb-2">
+              <div class="px-1 pb-1">
+                <h3 class="text-sm font-bold text-white truncate">${place.title}</h3>
+                <p class="text-[10px] text-slate-400 mt-0.5"><i class="fa-regular fa-clock mr-1"></i>${checkDate}</p>
+              </div>
             </div>
           `;
         }
@@ -385,8 +389,13 @@
 
         const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.8);
 
+        // Generate precise timestamp
+        const now = new Date();
+        const dateStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
         appState[activeArPlace].checkedIn = true;
         appState[activeArPlace].photo = dataUrl;
+        appState[activeArPlace].checkInDate = dateStr;
         saveState();
 
         alert(`Successfully Checked In at ${placesData[activeArPlace].title}!`);
@@ -627,7 +636,7 @@
         document.getElementById('ar-ui-container').classList.add('hidden');
         document.getElementById('scanning-overlay').classList.remove('hidden');
         
-        // Update scanning text
+        // Update scanning text dynamically
         document.getElementById('scanning-target-name').innerText = "Look for " + placesData[target].title;
 
         document.getElementById('ar-container').classList.remove('hidden');
@@ -637,7 +646,7 @@
         document.getElementById('ar-desc').innerText = placesData[target].desc;
         setArMode('info'); 
 
-        // Inject A-Frame HTML safely
+        // Inject A-Frame HTML safely (with uiScanning: no)
         document.getElementById('ar-container').innerHTML = `
           <a-scene 
             mindar-image="imageTargetSrc: ${placesData[target].mindFile}; uiScanning: no; uiLoading: no; autoStart: true; filterMinCF:0.0001; filterBeta: 0.001;" 
@@ -662,6 +671,7 @@
               <!-- WRAPPER FOR DRAG CONTROLS -->
               <a-entity id="ar-models-wrapper" drag-rotate-scale position="0 -0.3 0" scale="0.4 0.4 0.4" visible="false">
                 
+                <!-- Masjid 3D Object -->
                 <a-entity id="model-masjid" visible="${target === 'masjid' ? 'true' : 'false'}">
                   <a-box position="0 0 0" width="3.0" height="0.05" depth="3.0" src="#tex-tile" repeat="8 8"></a-box>
                   <a-box position="0 0.15 1.45" width="3.0" height="0.3" depth="0.1" src="#tex-stone" repeat="6 1"></a-box>
@@ -691,6 +701,7 @@
                   <a-entity position="1.2 0 -1.2"><a-box position="0 0.4 0" width="0.3" height="0.8" depth="0.3" src="#tex-stone"></a-box><a-cylinder position="0 1.2 0" radius="0.12" height="0.8" src="#tex-marble"></a-cylinder><a-sphere position="0 1.6 0" radius="0.12" src="#tex-dome" theta-length="180"></a-sphere></a-entity>
                 </a-entity>
 
+                <!-- FC Block 3D Object -->
                 <a-entity id="model-fc" visible="${target === 'fc' ? 'true' : 'false'}" position="0 0.2 0">
                   <a-box position="0 -0.05 0" width="3" height="0.1" depth="2" color="#475569"></a-box>
                   <a-box position="0 0.6 -0.3" width="1.2" height="1.2" depth="0.8" src="#tex-fc-window" repeat="2 3"></a-box>
