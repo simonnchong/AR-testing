@@ -33,7 +33,6 @@
           this.y_cord = e.touches[0].clientY;
         } else if (e.touches.length === 2) {
           this.ifMouseDown = false;
-          // Calculate distance between two fingers for pinch zoom
           this.initialDistance = Math.hypot(
             e.touches[0].clientX - e.touches[1].clientX,
             e.touches[0].clientY - e.touches[1].clientY
@@ -42,6 +41,7 @@
         }
       },
       OnTouchMove: function (e) {
+        // Prevent rotating if we are touching a button
         if(e.target.closest('#controls-container') || e.target.id === 'start-btn') return;
         
         if (this.ifMouseDown && e.touches.length === 1) {
@@ -51,7 +51,6 @@
           
           this.el.object3D.rotation.y += temp_x * this.data.speed * 0.005;
           this.el.object3D.rotation.x += temp_y * this.data.speed * 0.005;
-          
           this.el.object3D.rotation.x = Math.max(-Math.PI/4, Math.min(Math.PI/4, this.el.object3D.rotation.x));
           
           this.x_cord = e.touches[0].clientX;
@@ -86,10 +85,7 @@
     
     #start-screen {
       position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+      top: 0; left: 0; width: 100%; height: 100%;
       background-color: rgba(15, 23, 42, 0.9);
       z-index: 9999;
       display: flex;
@@ -100,135 +96,53 @@
       backdrop-filter: blur(10px);
     }
 
-    #start-screen h1 {
-      margin-bottom: 10px;
-      font-size: 28px;
-    }
-
-    #start-screen p {
-      margin-bottom: 30px;
-      font-size: 16px;
-      color: #cbd5e1;
-      text-align: center;
-      max-width: 80%;
-    }
+    #start-screen h1 { margin-bottom: 10px; font-size: 28px; }
+    #start-screen p { margin-bottom: 30px; font-size: 16px; color: #cbd5e1; text-align: center; max-width: 80%; }
 
     #start-btn {
-      background-color: #3b82f6;
-      color: white;
-      border: none;
-      padding: 15px 35px;
-      font-size: 18px;
-      font-weight: bold;
-      border-radius: 30px;
-      cursor: pointer;
-      box-shadow: 0 4px 15px rgba(59, 130, 246, 0.5);
-      transition: transform 0.2s, background-color 0.2s;
+      background-color: #3b82f6; color: white; border: none; padding: 15px 35px;
+      font-size: 18px; font-weight: bold; border-radius: 30px; cursor: pointer;
+      box-shadow: 0 4px 15px rgba(59, 130, 246, 0.5); transition: transform 0.2s;
     }
 
-    #start-btn:active {
-      transform: scale(0.95);
-      background-color: #2563eb;
-    }
+    #start-btn:active { transform: scale(0.95); }
 
+    /* Higher UI Container so buttons aren't blocked by mobile browser bars */
     #ui-container {
-      position: absolute;
-      bottom: 60px;
-      left: 0;
-      width: 100%;
-      text-align: center;
-      z-index: 99999;
-      pointer-events: none;
+      position: absolute; bottom: 80px; left: 0; width: 100%;
+      text-align: center; z-index: 99999; pointer-events: none;
     }
     
     .instruction-badge {
-      display: inline-block;
-      background: rgba(0, 0, 0, 0.7);
-      color: white;
-      padding: 10px 20px;
-      border-radius: 20px;
-      font-size: 14px;
-      backdrop-filter: blur(5px);
-      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-      margin-bottom: 20px;
+      display: inline-block; background: rgba(0, 0, 0, 0.7); color: white;
+      padding: 10px 20px; border-radius: 20px; font-size: 14px;
+      backdrop-filter: blur(5px); box-shadow: 0 4px 6px rgba(0,0,0,0.3); margin-bottom: 20px;
     }
 
     #controls-container {
-      position: absolute;
-      bottom: 0px; 
-      left: 0;
-      width: 100%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 20px;
-      pointer-events: auto;
+      display: flex; justify-content: center; align-items: center; gap: 20px; pointer-events: auto;
     }
 
     .control-btn {
-      background: rgba(15, 23, 42, 0.8);
-      color: white;
-      border: 2px solid rgba(255, 255, 255, 0.2);
-      border-radius: 50%;
-      width: 50px;
-      height: 50px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      font-size: 20px;
-      cursor: pointer;
-      backdrop-filter: blur(5px);
-      transition: all 0.2s;
+      background: rgba(15, 23, 42, 0.8); color: white; border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: 50%; width: 50px; height: 50px; display: flex;
+      justify-content: center; align-items: center; font-size: 20px; cursor: pointer; backdrop-filter: blur(5px);
     }
 
-    .control-btn:active {
-      transform: scale(0.9);
-      background: rgba(59, 130, 246, 0.8);
-    }
-
-    .capture-btn {
-      width: 65px;
-      height: 65px;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.9);
-      border: 4px solid #3b82f6;
-      color: #3b82f6;
-      font-size: 24px;
-    }
+    .control-btn:active { transform: scale(0.9); }
+    .capture-btn { width: 65px; height: 65px; background: rgba(255, 255, 255, 0.9); border: 4px solid #3b82f6; color: #3b82f6; font-size: 24px; }
 
     #gallery-modal {
-      display: none;
-      position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.9);
-      z-index: 100000;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
+      display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.9); z-index: 100000; flex-direction: column; justify-content: center; align-items: center;
     }
-
-    #gallery-image {
-      max-width: 90%;
-      max-height: 70%;
-      border-radius: 10px;
-      border: 2px solid white;
-      margin-bottom: 20px;
-    }
-
-    .close-btn {
-      background: #ef4444;
-      color: white;
-      padding: 10px 30px;
-      border-radius: 20px;
-      border: none;
-      font-size: 16px;
-      font-weight: bold;
-    }
+    #gallery-image { max-width: 90%; max-height: 70%; border-radius: 10px; border: 2px solid white; margin-bottom: 20px; }
+    .close-btn { background: #ef4444; color: white; padding: 10px 30px; border-radius: 20px; border: none; font-size: 16px; font-weight: bold; }
   </style>
 
   <script>
     window.addEventListener('unhandledrejection', function(event) {
-      console.warn("Caught unhandled promise rejection. This usually means a file (.mind, .glb) is missing.", event.reason || event);
+      console.warn("Caught unhandled promise rejection. (Often due to missing files or camera block)", event.reason || event);
       event.preventDefault(); 
     });
 
@@ -250,29 +164,25 @@
         const arSystem = sceneEl.systems["mindar-image-system"];
         if(arSystem) {
             arSystem.start().catch((err) => {
-                console.error("MindAR failed to start.", err);
                 alert("Failed to start AR. Please ensure camera access is allowed.");
             });
         }
       });
 
-      // 1. Flip Camera Logic (Safely handled)
+      // 1. Flip Camera
       flipBtn.addEventListener("click", function() {
         const arSystem = sceneEl.systems["mindar-image-system"];
         if(arSystem) {
           try {
-            if (typeof arSystem.switchCamera === 'function') {
-                arSystem.switchCamera();
-            } else {
-                alert("Your browser/device does not support flipping the camera in this mode.");
-            }
+            if (typeof arSystem.switchCamera === 'function') arSystem.switchCamera();
+            else alert("Your browser/device does not support flipping the camera in this mode.");
           } catch(e) {
-            alert("Error switching camera. Front camera might be restricted.");
+            alert("Error switching camera.");
           }
         }
       });
 
-      // 2. Capture Photo Logic (Correctly merging Video + 3D, Hiding UI, Naming file)
+      // 2. CAPTURE LOGIC (Hides UI, Adds Flash, Aspect Ratio Math, Timestamps)
       captureBtn.addEventListener("click", function() {
         const video = document.querySelector('video');
         const glCanvas = sceneEl.canvas;
@@ -282,32 +192,33 @@
           return;
         }
 
-        // HIDE THE UI
+        // HIDE THE UI BEFORE CAPTURE
         uiContainer.style.display = "none";
 
-        // Create Flash Effect
+        // ADD VISUAL FLASH EFFECT
         const flash = document.createElement('div');
         flash.style.position = 'absolute';
         flash.style.top = '0'; flash.style.left = '0';
         flash.style.width = '100%'; flash.style.height = '100%';
         flash.style.backgroundColor = 'white';
         flash.style.zIndex = '999999';
+        flash.style.transition = 'opacity 0.4s ease-out';
         document.body.appendChild(flash);
 
-        // Wait a tiny bit for the UI to disappear before capturing
+        // Wait slightly so the browser genuinely hides the UI layer
         setTimeout(() => {
+          
           // Fade out the flash
-          flash.style.transition = 'opacity 0.5s';
           flash.style.opacity = '0';
-          setTimeout(() => flash.remove(), 500);
+          setTimeout(() => flash.remove(), 400);
 
-          // Setup merging canvas
+          // Prepare the temporary canvas for merging
           const tempCanvas = document.createElement('canvas');
           tempCanvas.width = glCanvas.width;
           tempCanvas.height = glCanvas.height;
           const ctx = tempCanvas.getContext('2d');
 
-          // Calculate aspect ratios to prevent zooming or squishing the video
+          // PRECISE ASPECT RATIO MATH for Camera Video
           const vw = video.videoWidth;
           const vh = video.videoHeight;
           const cw = glCanvas.width;
@@ -328,16 +239,16 @@
              startY = (ch - drawHeight) / 2;
           }
 
-          // Draw the video background perfectly sized
+          // Draw Camera Video
           ctx.drawImage(video, startX, startY, drawWidth, drawHeight);
           
-          // Draw the 3D AR layer on top
+          // Draw 3D Model Layer on top
           ctx.drawImage(glCanvas, 0, 0, cw, ch);
 
-          // Convert to JPG
+          // Get image data
           const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.9);
 
-          // Generate custom Filename (Masjid_YYYYMMDD_HHMMSS)
+          // AUTOMATIC TIMESTAMP NAMING (Masjid_YYYYMMDD_HHMMSS)
           const now = new Date();
           const timestamp = now.getFullYear().toString() + 
                            (now.getMonth()+1).toString().padStart(2,'0') + 
@@ -347,34 +258,29 @@
                            now.getSeconds().toString().padStart(2,'0');
           const fileName = 'Masjid_' + timestamp + '.jpg';
 
-          // Trigger Download
+          // Download image to phone
           const link = document.createElement('a');
           link.download = fileName;
           link.href = dataUrl;
           link.click();
 
-          // Save to browser LocalStorage for Gallery
-          try {
-            localStorage.setItem('savedMasjidSnapshot', dataUrl);
-          } catch (e) {
-            console.warn("Could not save to LocalStorage (possibly out of space)", e);
-          }
+          // Save to LocalStorage for Gallery viewing
+          try { localStorage.setItem('savedMasjidSnapshot', dataUrl); } 
+          catch (e) { console.warn("Could not save to LocalStorage", e); }
 
-          // RESTORE THE UI
+          // RESTORE UI AFTER CAPTURE
           uiContainer.style.display = "block";
 
-        }, 50); // Small delay to guarantee UI is hidden in the frame
+        }, 150); // Delay to ensure UI disappears
       });
 
-      // 3. Gallery Logic
+      // 3. Gallery
       galleryBtn.addEventListener("click", function() {
         const savedImage = localStorage.getItem('savedMasjidSnapshot');
         if (savedImage) {
           galleryImage.src = savedImage;
           galleryModal.style.display = "flex";
-        } else {
-          alert("You haven't taken any photos yet!");
-        }
+        } else alert("You haven't taken any photos yet!");
       });
 
       closeGalleryBtn.addEventListener("click", function() {
@@ -397,12 +303,8 @@
     <button class="close-btn" id="close-gallery">Close Gallery</button>
   </div>
 
-  <!-- UI Overlay for Instructions & Controls -->
   <div id="ui-container">
-    <div class="instruction-badge">
-      Scan the image. Use fingers to rotate & scale.
-    </div>
-    
+    <div class="instruction-badge">Scan image. Drag to rotate, pinch to scale.</div>
     <div id="controls-container">
       <button class="control-btn" id="flip-btn" title="Flip Camera">🔄</button>
       <button class="control-btn capture-btn" id="capture-btn" title="Take Photo">📸</button>
@@ -417,35 +319,27 @@
     vr-mode-ui="enabled: false" 
     device-orientation-permission-ui="enabled: false">
     
-    <!-- Code-generated High-Resolution Textures -->
     <a-assets>
-      <!-- Geometric Floor Tile -->
       <img id="tex-tile" src="data:image/svg+xml;utf8,<svg width='64' height='64' xmlns='http://www.w3.org/2000/svg'><rect width='64' height='64' fill='%23f1f5f9'/><path d='M32 0 L64 32 L32 64 L0 32 Z' fill='%23cbd5e1'/><circle cx='32' cy='32' r='16' fill='%2394a3b8'/></svg>">
-      <!-- Sandstone Masonry Wall -->
       <img id="tex-stone" src="data:image/svg+xml;utf8,<svg width='128' height='128' xmlns='http://www.w3.org/2000/svg'><rect width='128' height='128' fill='%23eaddcf'/><path d='M0 32 h128 M0 64 h128 M0 96 h128 M32 0 v32 M96 0 v32 M64 32 v32 M16 64 v32 M80 64 v32 M48 96 v32 M112 96 v32' stroke='%23c1ae98' stroke-width='2'/></svg>">
-      <!-- Emerald Diamond Dome -->
       <img id="tex-dome" src="data:image/svg+xml;utf8,<svg width='64' height='64' xmlns='http://www.w3.org/2000/svg'><rect width='64' height='64' fill='%23059669'/><path d='M32 0 L64 32 L32 64 L0 32 Z' stroke='%23047857' stroke-width='2' fill='none'/><path d='M0 0 L32 32 L0 64 M64 0 L32 32 L64 64' stroke='%23047857' stroke-width='2' fill='none'/></svg>">
-      <!-- Arched Dark Window -->
       <img id="tex-window" src="data:image/svg+xml;utf8,<svg width='32' height='64' xmlns='http://www.w3.org/2000/svg'><rect width='32' height='64' fill='%23eaddcf'/><path d='M4 32 A 12 12 0 0 1 28 32 L 28 60 L 4 60 Z' fill='%231e293b'/><path d='M16 20 L 16 60 M 4 40 L 28 40 M 4 50 L 28 50' stroke='%23334155' stroke-width='2'/></svg>">
-      <!-- Clean Marble -->
       <img id="tex-marble" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' fill='%23f8fafc'/><path d='M0 63 L64 63 M63 0 L63 64' stroke='%23e2e8f0' stroke-width='2'/></svg>">
     </a-assets>
 
     <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
     <a-entity mindar-image-target="targetIndex: 0">
-      
-      <!-- MAIN MASJID 3D GROUP -->
       <a-entity drag-rotate-scale position="0 -0.5 0" scale="0.4 0.4 0.4">
         
-        <!-- === COURTYARD BASE === -->
+        <!-- Base -->
         <a-box position="0 0 0" width="3.0" height="0.05" depth="3.0" src="#tex-tile" repeat="8 8" shadow></a-box>
         <a-box position="0 0.15 1.45" width="3.0" height="0.3" depth="0.1" src="#tex-stone" repeat="6 1"></a-box>
         <a-box position="0 0.15 -1.45" width="3.0" height="0.3" depth="0.1" src="#tex-stone" repeat="6 1"></a-box>
         <a-box position="1.45 0.15 0" width="0.1" height="0.3" depth="2.8" src="#tex-stone" repeat="6 1"></a-box>
         <a-box position="-1.45 0.15 0" width="0.1" height="0.3" depth="2.8" src="#tex-stone" repeat="6 1"></a-box>
 
-        <!-- === MAIN BUILDING === -->
+        <!-- Building -->
         <a-box position="0 0.45 0" width="1.6" height="0.8" depth="1.6" src="#tex-stone" repeat="4 2"></a-box>
         <a-cylinder position="0 1.0 0" radius="0.9" height="0.3" segments-radial="8" src="#tex-stone" repeat="3 1"></a-cylinder>
 
@@ -456,35 +350,19 @@
         <a-plane position="0.4 0.45 -0.81" width="0.2" height="0.4" rotation="0 180 0" src="#tex-window"></a-plane>
         <a-plane position="-0.4 0.45 -0.81" width="0.2" height="0.4" rotation="0 180 0" src="#tex-window"></a-plane>
 
-        <!-- === DOME STRUCTURE === -->
+        <!-- Dome -->
         <a-cylinder position="0 1.25 0" radius="0.6" height="0.25" src="#tex-stone" repeat="4 1"></a-cylinder>
         <a-sphere position="0 1.35 0" radius="0.6" src="#tex-dome" repeat="8 4" theta-length="180" material="roughness: 0.3; metalness: 0.2"></a-sphere>
         <a-cylinder position="0 2.1 0" radius="0.02" height="0.3" color="#fbbf24" material="metalness: 0.8"></a-cylinder>
         <a-torus position="0 2.3 0" radius="0.08" radius-tubular="0.015" arc="180" color="#fbbf24" rotation="0 90 90" material="metalness: 0.8"></a-torus>
 
-        <!-- 4 Small Corner Domes -->
-        <a-entity position="-0.7 0.9 0.7">
-          <a-cylinder position="0 0 0" radius="0.15" height="0.1" src="#tex-stone"></a-cylinder>
-          <a-sphere position="0 0.05 0" radius="0.15" src="#tex-dome" theta-length="180"></a-sphere>
-          <a-cylinder position="0 0.3 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder>
-        </a-entity>
-        <a-entity position="0.7 0.9 0.7">
-          <a-cylinder position="0 0 0" radius="0.15" height="0.1" src="#tex-stone"></a-cylinder>
-          <a-sphere position="0 0.05 0" radius="0.15" src="#tex-dome" theta-length="180"></a-sphere>
-          <a-cylinder position="0 0.3 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder>
-        </a-entity>
-        <a-entity position="-0.7 0.9 -0.7">
-          <a-cylinder position="0 0 0" radius="0.15" height="0.1" src="#tex-stone"></a-cylinder>
-          <a-sphere position="0 0.05 0" radius="0.15" src="#tex-dome" theta-length="180"></a-sphere>
-          <a-cylinder position="0 0.3 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder>
-        </a-entity>
-        <a-entity position="0.7 0.9 -0.7">
-          <a-cylinder position="0 0 0" radius="0.15" height="0.1" src="#tex-stone"></a-cylinder>
-          <a-sphere position="0 0.05 0" radius="0.15" src="#tex-dome" theta-length="180"></a-sphere>
-          <a-cylinder position="0 0.3 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder>
-        </a-entity>
+        <!-- 4 Corner Domes -->
+        <a-entity position="-0.7 0.9 0.7"><a-cylinder position="0 0 0" radius="0.15" height="0.1" src="#tex-stone"></a-cylinder><a-sphere position="0 0.05 0" radius="0.15" src="#tex-dome" theta-length="180"></a-sphere><a-cylinder position="0 0.3 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder></a-entity>
+        <a-entity position="0.7 0.9 0.7"><a-cylinder position="0 0 0" radius="0.15" height="0.1" src="#tex-stone"></a-cylinder><a-sphere position="0 0.05 0" radius="0.15" src="#tex-dome" theta-length="180"></a-sphere><a-cylinder position="0 0.3 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder></a-entity>
+        <a-entity position="-0.7 0.9 -0.7"><a-cylinder position="0 0 0" radius="0.15" height="0.1" src="#tex-stone"></a-cylinder><a-sphere position="0 0.05 0" radius="0.15" src="#tex-dome" theta-length="180"></a-sphere><a-cylinder position="0 0.3 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder></a-entity>
+        <a-entity position="0.7 0.9 -0.7"><a-cylinder position="0 0 0" radius="0.15" height="0.1" src="#tex-stone"></a-cylinder><a-sphere position="0 0.05 0" radius="0.15" src="#tex-dome" theta-length="180"></a-sphere><a-cylinder position="0 0.3 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder></a-entity>
 
-        <!-- === ENTRANCE (IWAN) === -->
+        <!-- Entrance -->
         <a-entity position="0 0.02 0.8">
           <a-box position="0 0.4 0.05" width="0.7" height="0.8" depth="0.1" src="#tex-stone"></a-box>
           <a-box position="0 0.35 0.11" width="0.4" height="0.7" depth="0.05" color="#0f172a"></a-box>
@@ -493,50 +371,11 @@
           <a-cylinder position="0.25 0.4 0.12" radius="0.04" height="0.8" src="#tex-marble"></a-cylinder>
         </a-entity>
 
-        <!-- === 4 MINARETS === -->
-        <a-entity position="-1.2 0 1.2">
-          <a-box position="0 0.4 0" width="0.3" height="0.8" depth="0.3" src="#tex-stone"></a-box>
-          <a-cylinder position="0 1.2 0" radius="0.12" height="0.8" src="#tex-marble"></a-cylinder>
-          <a-cylinder position="0 1.6 0" radius="0.18" height="0.05" src="#tex-stone"></a-cylinder>
-          <a-cylinder position="0 1.9 0" radius="0.1" height="0.6" src="#tex-marble"></a-cylinder>
-          <a-cylinder position="0 2.2 0" radius="0.15" height="0.05" src="#tex-stone"></a-cylinder>
-          <a-cylinder position="0 2.4 0" radius="0.08" height="0.4" src="#tex-marble"></a-cylinder>
-          <a-sphere position="0 2.6 0" radius="0.1" src="#tex-dome" theta-length="180"></a-sphere>
-          <a-cylinder position="0 2.75 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder>
-        </a-entity>
-
-        <a-entity position="1.2 0 1.2">
-          <a-box position="0 0.4 0" width="0.3" height="0.8" depth="0.3" src="#tex-stone"></a-box>
-          <a-cylinder position="0 1.2 0" radius="0.12" height="0.8" src="#tex-marble"></a-cylinder>
-          <a-cylinder position="0 1.6 0" radius="0.18" height="0.05" src="#tex-stone"></a-cylinder>
-          <a-cylinder position="0 1.9 0" radius="0.1" height="0.6" src="#tex-marble"></a-cylinder>
-          <a-cylinder position="0 2.2 0" radius="0.15" height="0.05" src="#tex-stone"></a-cylinder>
-          <a-cylinder position="0 2.4 0" radius="0.08" height="0.4" src="#tex-marble"></a-cylinder>
-          <a-sphere position="0 2.6 0" radius="0.1" src="#tex-dome" theta-length="180"></a-sphere>
-          <a-cylinder position="0 2.75 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder>
-        </a-entity>
-
-        <a-entity position="-1.2 0 -1.2">
-          <a-box position="0 0.4 0" width="0.3" height="0.8" depth="0.3" src="#tex-stone"></a-box>
-          <a-cylinder position="0 1.2 0" radius="0.12" height="0.8" src="#tex-marble"></a-cylinder>
-          <a-cylinder position="0 1.6 0" radius="0.18" height="0.05" src="#tex-stone"></a-cylinder>
-          <a-cylinder position="0 1.9 0" radius="0.1" height="0.6" src="#tex-marble"></a-cylinder>
-          <a-cylinder position="0 2.2 0" radius="0.15" height="0.05" src="#tex-stone"></a-cylinder>
-          <a-cylinder position="0 2.4 0" radius="0.08" height="0.4" src="#tex-marble"></a-cylinder>
-          <a-sphere position="0 2.6 0" radius="0.1" src="#tex-dome" theta-length="180"></a-sphere>
-          <a-cylinder position="0 2.75 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder>
-        </a-entity>
-
-        <a-entity position="1.2 0 -1.2">
-          <a-box position="0 0.4 0" width="0.3" height="0.8" depth="0.3" src="#tex-stone"></a-box>
-          <a-cylinder position="0 1.2 0" radius="0.12" height="0.8" src="#tex-marble"></a-cylinder>
-          <a-cylinder position="0 1.6 0" radius="0.18" height="0.05" src="#tex-stone"></a-cylinder>
-          <a-cylinder position="0 1.9 0" radius="0.1" height="0.6" src="#tex-marble"></a-cylinder>
-          <a-cylinder position="0 2.2 0" radius="0.15" height="0.05" src="#tex-stone"></a-cylinder>
-          <a-cylinder position="0 2.4 0" radius="0.08" height="0.4" src="#tex-marble"></a-cylinder>
-          <a-sphere position="0 2.6 0" radius="0.1" src="#tex-dome" theta-length="180"></a-sphere>
-          <a-cylinder position="0 2.75 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder>
-        </a-entity>
+        <!-- 4 Minarets -->
+        <a-entity position="-1.2 0 1.2"><a-box position="0 0.4 0" width="0.3" height="0.8" depth="0.3" src="#tex-stone"></a-box><a-cylinder position="0 1.2 0" radius="0.12" height="0.8" src="#tex-marble"></a-cylinder><a-cylinder position="0 1.6 0" radius="0.18" height="0.05" src="#tex-stone"></a-cylinder><a-cylinder position="0 1.9 0" radius="0.1" height="0.6" src="#tex-marble"></a-cylinder><a-cylinder position="0 2.2 0" radius="0.15" height="0.05" src="#tex-stone"></a-cylinder><a-cylinder position="0 2.4 0" radius="0.08" height="0.4" src="#tex-marble"></a-cylinder><a-sphere position="0 2.6 0" radius="0.1" src="#tex-dome" theta-length="180"></a-sphere><a-cylinder position="0 2.75 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder></a-entity>
+        <a-entity position="1.2 0 1.2"><a-box position="0 0.4 0" width="0.3" height="0.8" depth="0.3" src="#tex-stone"></a-box><a-cylinder position="0 1.2 0" radius="0.12" height="0.8" src="#tex-marble"></a-cylinder><a-cylinder position="0 1.6 0" radius="0.18" height="0.05" src="#tex-stone"></a-cylinder><a-cylinder position="0 1.9 0" radius="0.1" height="0.6" src="#tex-marble"></a-cylinder><a-cylinder position="0 2.2 0" radius="0.15" height="0.05" src="#tex-stone"></a-cylinder><a-cylinder position="0 2.4 0" radius="0.08" height="0.4" src="#tex-marble"></a-cylinder><a-sphere position="0 2.6 0" radius="0.1" src="#tex-dome" theta-length="180"></a-sphere><a-cylinder position="0 2.75 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder></a-entity>
+        <a-entity position="-1.2 0 -1.2"><a-box position="0 0.4 0" width="0.3" height="0.8" depth="0.3" src="#tex-stone"></a-box><a-cylinder position="0 1.2 0" radius="0.12" height="0.8" src="#tex-marble"></a-cylinder><a-cylinder position="0 1.6 0" radius="0.18" height="0.05" src="#tex-stone"></a-cylinder><a-cylinder position="0 1.9 0" radius="0.1" height="0.6" src="#tex-marble"></a-cylinder><a-cylinder position="0 2.2 0" radius="0.15" height="0.05" src="#tex-stone"></a-cylinder><a-cylinder position="0 2.4 0" radius="0.08" height="0.4" src="#tex-marble"></a-cylinder><a-sphere position="0 2.6 0" radius="0.1" src="#tex-dome" theta-length="180"></a-sphere><a-cylinder position="0 2.75 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder></a-entity>
+        <a-entity position="1.2 0 -1.2"><a-box position="0 0.4 0" width="0.3" height="0.8" depth="0.3" src="#tex-stone"></a-box><a-cylinder position="0 1.2 0" radius="0.12" height="0.8" src="#tex-marble"></a-cylinder><a-cylinder position="0 1.6 0" radius="0.18" height="0.05" src="#tex-stone"></a-cylinder><a-cylinder position="0 1.9 0" radius="0.1" height="0.6" src="#tex-marble"></a-cylinder><a-cylinder position="0 2.2 0" radius="0.15" height="0.05" src="#tex-stone"></a-cylinder><a-cylinder position="0 2.4 0" radius="0.08" height="0.4" src="#tex-marble"></a-cylinder><a-sphere position="0 2.6 0" radius="0.1" src="#tex-dome" theta-length="180"></a-sphere><a-cylinder position="0 2.75 0" radius="0.005" height="0.2" color="#fbbf24"></a-cylinder></a-entity>
 
       </a-entity>
     </a-entity>
